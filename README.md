@@ -1,38 +1,20 @@
-solr-thymeleaf-responsewriter
+solr-bmax-queryparser
 ==================
 
-![travis ci build status](https://travis-ci.org/shopping24/solr-thymeleaf.png)
+![travis ci build status](https://travis-ci.org/shopping24/solr-bmax-queryparser.png)
 
-A Solr component to use the [Thymeleaf template engine](http://www.thymeleaf.org/).
+A boosting dismax query parser for Apache Solr.
 
 ## Installing the component
 
-* Place the [`solr-thymeleaf-<VERSION>-jar-with-dependencies.jar`](https://github.com/shopping24/solr-thymeleaf/releases) in the `/lib` 
+* Place the [`solr-bmax-queryparser-<VERSION>-jar-with-dependencies.jar`](https://github.com/shopping24/solr-bmax-queryparser/releases) in the `/lib` 
   directory of your Solr installation.
-* Configure the component in your `solrconfig.xml`:
-
-    <!-- html / thymeleaf response writer -->
-    <queryResponseWriter name="html" class="com.s24.search.solr.response.ThymeleafResponseWriter" />
-
-### Configuring template resolving
-
-Pass the template to render in the `tl.template` request parameter. You can configure Thymeleaf template resolving:
-
-    <queryResponseWriter name="html" class="com.s24.search.solr.response.ThymeleafResponseWriter">
-         <str name="tl.templateMode">XHTML</str>
-         <str name="tl.locale">de_de</str>
-         <str name="tl.cacheTTLMs">3600000</str>
-         <str name="tl.prefix">.html</str>
-         <str name="tl.suffix">${solr.core.config}/templates/</str>
-    </queryResponseWriter>
-
-The template context is prefilled with the current `request`, the request `params` and a solr `response`.
+* ...
 
 ## Building the project
 
 This should install the current version into your local repository
 
-    $ export JAVA_HOME=$(/usr/libexec/java_home -v 1.7)
     $ export MAVEN_OPTS="-Dmaven.wagon.http.ssl.insecure=true -Dmaven.wagon.http.ssl.allowall=true -Dmaven.wagon.http.ssl.ignore.validity.dates=true"
     $ mvn clean install
     
