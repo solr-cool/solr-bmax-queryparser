@@ -6,6 +6,11 @@ import java.io.IOException;
 import org.apache.commons.io.IOUtils;
 import org.apache.lucene.analysis.TokenStream;
 
+/**
+ * Utility methods to close, end and reset {@linkplain TokenStream}s quietly. 
+ * 
+ * @author Shopping24 GmbH, Torsten Bøgh Köster (@tboeghk)
+ */
 public class TokenStreams {
 
    public static void resetQuietly(TokenStream tokenStream) {

@@ -3,13 +3,41 @@ solr-bmax-queryparser
 
 ![travis ci build status](https://travis-ci.org/shopping24/solr-bmax-queryparser.png)
 
-A boosting dismax query parser for Apache Solr.
+A boosting dismax query parser for Apache Solr. The bmax query parser relies on
+field types and tokenizer chains to parse the user query, discover synonyms, boost 
+and penalize terms at query time. Hence it is highly configurable. The lucene query
+composed is a dismax query with a minimum must match of 100%.
+
+## Query processing
+
+### Parsing the user query
+
+### Discovering synonyms (optional)
+
+### Discovering boost and penalize terms (optional)
+
+### Building the query
 
 ## Installing the component
 
 * Place the [`solr-bmax-queryparser-<VERSION>-jar-with-dependencies.jar`](https://github.com/shopping24/solr-bmax-queryparser/releases) in the `/lib` 
   directory of your Solr installation.
-* ...
+
+## Configuring the query parser
+
+    <!-- bmax parser -->
+    <queryParser name="bmax" class="com.s24.search.solr.query.bmax.BmaxQParserPlugin">
+        <str name="synonymFieldType">fieldType_synonyms</str>
+        <str name="queryParsingFieldType"fieldType_query</str>
+        <str name="boostUpFieldType"fieldType_boostterms</str>
+        <str name="boostDownFieldType">fieldType_penalizeterms</str>
+    </queryParser>
+
+    bmax.manipulateDocumentFrequencies
+    bmax.manipulateTermFrequencies
+    
+
+### URL parameters
 
 ## Building the project
 
