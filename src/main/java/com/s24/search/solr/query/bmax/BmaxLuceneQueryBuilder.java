@@ -42,10 +42,10 @@ public class BmaxLuceneQueryBuilder {
    private SolrIndexSearcher indexSearcher;
    private int maxDocumentFrequencyInQuery = -1;
 
-   public BmaxLuceneQueryBuilder(BmaxQuery e3comQuery) {
-      checkNotNull(e3comQuery, "Pre-condition violated: e3comQuery must not be null.");
+   public BmaxLuceneQueryBuilder(BmaxQuery bmaxQuery) {
+      checkNotNull(bmaxQuery, "Pre-condition violated: bmaxQuery must not be null.");
 
-      this.bmaxquery = e3comQuery;
+      this.bmaxquery = bmaxQuery;
    }
 
    public BmaxLuceneQueryBuilder withMultiplicativeBoost(List<ValueSource> multiplicativeBoost) {
@@ -66,21 +66,20 @@ public class BmaxLuceneQueryBuilder {
    // ---- go build yourself
 
    public Query build() {
-      checkNotNull(schema, "Pre-condition violated: schema must not be null.");
-      checkNotNull(indexSearcher, "Pre-condition violated: indexSearcher must not be null.");
-
       Query inner = buildWrappingQuery();
 
       // default
       Query main = inner;
 
-      if (multiplicativeBoost.size() > 1) {
-         ValueSource prod = new ProductFloatFunction(
-               multiplicativeBoost.toArray(new ValueSource[multiplicativeBoost.size()]));
-         main = new BoostedQuery(inner, prod);
-      }
-      if (multiplicativeBoost.size() == 1) {
-         main = new BoostedQuery(inner, multiplicativeBoost.get(0));
+      if (multiplicativeBoost != null) {
+         if (multiplicativeBoost.size() > 1) {
+            ValueSource prod = new ProductFloatFunction(
+                  multiplicativeBoost.toArray(new ValueSource[multiplicativeBoost.size()]));
+            main = new BoostedQuery(inner, prod);
+         }
+         if (multiplicativeBoost.size() == 1) {
+            main = new BoostedQuery(inner, multiplicativeBoost.get(0));
+         }
       }
 
       return main;
