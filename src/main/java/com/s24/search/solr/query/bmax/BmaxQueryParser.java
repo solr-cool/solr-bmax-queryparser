@@ -31,6 +31,8 @@ public class BmaxQueryParser extends ExtendedDismaxQParser {
    public static final String PARAM_MANIPULATE_DOCUMENT_FREQUENCIES = "bmax.manipulateDocumentFrequencies";
    public static final String PARAM_MANIPULATE_TERM_FREQUENCIES = "bmax.manipulateTermFrequencies";
 
+   private static final String WILDCARD = "*:*";
+
    private final Analyzer boostUpAnalyzer;
    private final Analyzer boostDownAnalyzer;
    private final Analyzer synonymAnalyzer;
@@ -96,14 +98,16 @@ public class BmaxQueryParser extends ExtendedDismaxQParser {
          }
 
          // iterate terms
-         for (String term : Terms.collect(getString(), queryParsingAnalyzer)) {
+         if (!WILDCARD.equals(getString())) {
+            for (String term : Terms.collect(getString(), queryParsingAnalyzer)) {
 
-            // add term
-            query.getTermsAndSynonyms().put(term, new HashSet<String>());
+               // add term
+               query.getTermsAndSynonyms().put(term, new HashSet<String>());
 
-            if (synonymAnalyzer != null) {
-               query.getTermsAndSynonyms().get(term)
-                     .addAll(Sets.newHashSet(Terms.collect(qstr, synonymAnalyzer)));
+               if (synonymAnalyzer != null) {
+                  query.getTermsAndSynonyms().get(term)
+                        .addAll(Sets.newHashSet(Terms.collect(qstr, synonymAnalyzer)));
+               }
             }
          }
 

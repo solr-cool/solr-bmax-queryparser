@@ -1,8 +1,8 @@
 package com.s24.search.solr.query.bmax;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
 
-import org.apache.lucene.search.BooleanQuery;
+import org.apache.lucene.search.MatchAllDocsQuery;
 import org.apache.lucene.search.Query;
 import org.junit.Test;
 
@@ -16,7 +16,7 @@ public class BmaxLuceneQueryBuilderTest {
       Query buildedQuery = new BmaxLuceneQueryBuilder(bmaxQuery)
             .build();
 
-      assertEquals(new BooleanQuery(true), buildedQuery);
+      assertEquals(new MatchAllDocsQuery(), buildedQuery);
 
    }
 

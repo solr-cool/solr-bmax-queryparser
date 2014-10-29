@@ -18,6 +18,7 @@ import org.apache.lucene.search.BooleanClause;
 import org.apache.lucene.search.BooleanClause.Occur;
 import org.apache.lucene.search.BooleanQuery;
 import org.apache.lucene.search.DisjunctionMaxQuery;
+import org.apache.lucene.search.MatchAllDocsQuery;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.search.TermQuery;
 import org.apache.solr.schema.IndexSchema;
@@ -89,6 +90,10 @@ public class BmaxLuceneQueryBuilder {
     * Builds the wrapping, unboosted query.
     */
    protected Query buildWrappingQuery() {
+      if (bmaxquery.getTermsAndSynonyms().isEmpty()) {
+         return new MatchAllDocsQuery();
+      } 
+         
       BooleanQuery bq = new BooleanQuery(true);
 
       // iterate terms
