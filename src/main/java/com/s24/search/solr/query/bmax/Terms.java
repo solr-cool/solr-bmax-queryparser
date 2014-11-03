@@ -78,7 +78,8 @@ public class Terms {
          TermToBytesRefAttribute termAttribute = tokenStream.addAttribute(TermToBytesRefAttribute.class);
 
          while (tokenStream.incrementToken()) {
-            // Needs to converted to a deep copy of byte ref, because on tokenStream.end()
+            // Needs to converted to a deep copy of byte ref, because on
+            // tokenStream.end()
             // the termAttribute will be flushed.
             termAttribute.fillBytesRef();
             result.add(new Term(field, BytesRef.deepCopyOf(termAttribute.getBytesRef())));
@@ -97,21 +98,19 @@ public class Terms {
    /**
     * Collects the maximum document frequency for the terms given.
     */
-   public static int collectMaximumDocumentFrequency(BmaxQuery query, Collection<Term> terms,
+   public static int collectMaximumDocumentFrequency(Collection<Term> terms,
          SolrIndexSearcher indexSearcher) {
       checkNotNull(terms, "Pre-condition violated: terms must not be null.");
       checkNotNull(indexSearcher, "Pre-condition violated: indexSearcher must not be null.");
 
       int df = -1;
 
-      if (query.isManipulateDocumentFrequencies()) {
-         try {
-            for (Term term : terms) {
-               df = Math.max(df, indexSearcher.docFreq(term));
-            }
-         } catch (IOException e) {
-            throw new RuntimeException(e);
+      try {
+         for (Term term : terms) {
+            df = Math.max(df, indexSearcher.docFreq(term));
          }
+      } catch (IOException e) {
+         throw new RuntimeException(e);
       }
 
       return df;

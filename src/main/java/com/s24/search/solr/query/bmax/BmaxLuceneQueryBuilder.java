@@ -151,7 +151,10 @@ public class BmaxLuceneQueryBuilder {
          Collection<Term> terms = Terms.collectTerms(term, analyzer, field);
 
          // get max document frequency of terms
-         int documentFrequency = Terms.collectMaximumDocumentFrequency(bmaxquery, terms, indexSearcher);
+         int documentFrequency = -1;
+         if (bmaxquery.isManipulateDocumentFrequencies()) {
+            documentFrequency = Terms.collectMaximumDocumentFrequency(terms, indexSearcher);
+         }
 
          // norm term queries and make sure their document frequency is always
          // below the main query's doc frequency.
@@ -185,7 +188,7 @@ public class BmaxLuceneQueryBuilder {
 
       // iterate fields and build concrete queries
       for (String field : bmaxquery.getFieldsAndBoosts().keySet()) {
-
+         
          // collect terms
          Analyzer analyzer = schema.getField(field).getType().getQueryAnalyzer();
          Set<Term> originalTerms = Sets.newHashSet(Terms.collectTerms(termWithSynonyms.getKey(), analyzer, field));
@@ -203,10 +206,13 @@ public class BmaxLuceneQueryBuilder {
          if (!synonyms.isEmpty()) {
 
             // get max document frequency of main terms
-            int documentFrequency = Terms.collectMaximumDocumentFrequency(bmaxquery, originalTerms, indexSearcher);
+            int documentFrequency = -1;
+            if (bmaxquery.isManipulateDocumentFrequencies()) {
+               documentFrequency = Terms.collectMaximumDocumentFrequency(originalTerms, indexSearcher);
 
-            // update maximum in query
-            this.maxDocumentFrequencyInQuery = Math.max(documentFrequency, maxDocumentFrequencyInQuery);
+               // update maximum in query
+               this.maxDocumentFrequencyInQuery = Math.max(documentFrequency, maxDocumentFrequencyInQuery);
+            }
 
             // add clauses
             dmq.add(buildTermQueries(field, synonyms, bmaxquery.getSynonymBoost(), documentFrequency));
