@@ -3,6 +3,7 @@ package com.s24.search.solr.query.bmax;
 import static com.google.common.base.Preconditions.checkNotNull;
 
 import org.apache.lucene.analysis.Analyzer;
+import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.params.SolrParams;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.request.SolrQueryRequest;
@@ -45,6 +46,7 @@ public class BmaxQParserPlugin extends QParserPlugin {
    public QParser createParser(String qstr, SolrParams localParams, SolrParams params, SolrQueryRequest req) {
       checkNotNull(req, "Pre-condition violated: req must not be null.");
 
+      // get query parsers if not available
       if (queryParsingAnalyzer == null) {
          this.boostUpAnalyzer = (boostUpFieldType != null) ? req.getSchema().getFieldTypeByName(boostUpFieldType)
                .getQueryAnalyzer() : null;
@@ -58,7 +60,14 @@ public class BmaxQParserPlugin extends QParserPlugin {
       }
       checkNotNull(queryParsingAnalyzer, "Pre-condition violated: queryParsingAnalyzer must not be null.");
 
-      return new BmaxQueryParser(qstr, localParams, params, req, queryParsingAnalyzer, synonymAnalyzer,
+      // check for modifiable solr params
+      if (!(req.getParams() instanceof ModifiableSolrParams)) {
+         
+         // and force them modifiable
+         req.setParams(new ModifiableSolrParams(req.getParams()));
+      } 
+      
+      return new BmaxQueryParser(qstr, localParams, req.getParams(), req, queryParsingAnalyzer, synonymAnalyzer,
             boostUpAnalyzer, boostDownAnalyzer);
    }
 }
