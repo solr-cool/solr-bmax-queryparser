@@ -1,4 +1,4 @@
-solr-bmax-queryparser
+The boosting dismax query parser (bmax)
 ==================
 
 ![travis ci build status](https://travis-ci.org/shopping24/solr-bmax-queryparser.png)
@@ -7,7 +7,7 @@ A boosting dismax query parser for Apache Solr. The bmax query parser relies on
 field types and tokenizer chains to parse the user query, discover synonyms, boost 
 and penalize terms at query time. Hence it is highly configurable. It does *not accept* any lucene query syntax (`~-+()`). The query composed is a dismax query with a minimum must match of 100%.
 
-## The boosting dismax query parser (bmax)
+## bmax query processing
 
 Query processing in the bmax query parser is split into 2 steps. First is parsing and tokenizing the input query. Second is synonym and boost term lookup.
 
@@ -17,12 +17,25 @@ Query processing is done via Solr query `Analyzer`s configured in `FieldTypes` i
 
 ### 1. Parsing the user query
 
+The contents of the `q` parameter are stuffed into the query analyzer of the configured `queryParsingFieldType`. The configured tokenizer tokenizes the input string and the configured analyzer could be used to remove stopwords (see example below).
 
 ### 2. Discovering synonyms (optional)
 
+Each token emitted from the `queryParsingFieldType`s query analyzer is placed in the `synonymFieldType` (if configured). Use the field's query analyzer to look up synonyms (see below). 
+
 ### 3. Discovering boost and penalize terms (optional)
 
+The tokens emitted from the `queryParsingFieldType`s query analyzer are also put into the `boostUpFieldType` and the `boostDownFieldType` to discover boost terms. In contrast to synonyms, boost terms are not used to widen the search result, they are used to do a boosting or penalizing inside the result documents.
+
 ### Building the query
+
+The tokens extracted from the configured field types are composed into a single lucene query.
+
+--> synonyms
+
+--> boost up terms (weight)
+
+--> rerank
 
 ## Installing the component
 
