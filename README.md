@@ -5,39 +5,84 @@ solr-bmax-queryparser
 
 A boosting dismax query parser for Apache Solr. The bmax query parser relies on
 field types and tokenizer chains to parse the user query, discover synonyms, boost 
-and penalize terms at query time. Hence it is highly configurable. The lucene query
-composed is a dismax query with a minimum must match of 100%.
+and penalize terms at query time. Hence it is highly configurable. It does *not accept* any lucene query syntax (`~-+()`). The query composed is a dismax query with a minimum must match of 100%.
 
-## Query processing
+## The boosting dismax query parser (bmax)
 
-### Parsing the user query
+Query processing in the bmax query parser is split into 2 steps. First is parsing and tokenizing the input query. Second is synonym and boost term lookup.
 
-### Discovering synonyms (optional)
+![image](./bmax_queryparsing.png)
 
-### Discovering boost and penalize terms (optional)
+Query processing is done via Solr query `Analyzer`s configured in `FieldTypes` in your `schema.xml`. Die field types to use for query processing are part of the query parser configuration in your `solrconfig.xml`.
+
+### 1. Parsing the user query
+
+
+### 2. Discovering synonyms (optional)
+
+### 3. Discovering boost and penalize terms (optional)
 
 ### Building the query
 
 ## Installing the component
 
 * Place the [`solr-bmax-queryparser-<VERSION>-jar-with-dependencies.jar`](https://github.com/shopping24/solr-bmax-queryparser/releases) in the `/lib` 
-  directory of your Solr installation.
+  directory of your Solr installation. 
+* Configure at least one field type in your `schema.xml` that can be used for query parsing and tokenizing
+* Configure the `bmax` query parser in your `solrconfig.xml` (see below)
+* Enable the `bmax` query parser using the `defType=bmax` parameter in your query.
 
 ## Configuring the query parser
 
-    <!-- bmax parser -->
+Add the `BmaxQParserPlugin` to the list of query parsers configured in your `solrconfig.xml`. It takes the following configuration parameters:
+
     <queryParser name="bmax" class="com.s24.search.solr.query.bmax.BmaxQParserPlugin">
-        <str name="synonymFieldType">fieldType_synonyms</str>
-        <str name="queryParsingFieldType"fieldType_query</str>
-        <str name="boostUpFieldType"fieldType_boostterms</str>
-        <str name="boostDownFieldType">fieldType_penalizeterms</str>
+        <!-- use this field type's query analyzer to tokenize the query -->
+        <str name="queryParsingFieldType">bmax_query</str>
+
+        <!-- further field types for synonyms and boostterms -->
+        <str name="synonymFieldType">bmax_synonyms</str>
+        <str name="boostUpFieldType">bmax_boostterms</str>
+        <str name="boostDownFieldType">bmax_penalizeterms</str>
     </queryParser>
+ 
+A simple example for a field type in your `schema.xml`, that tokenizes a incoming query and removes stopwords might be this:
+
+    <fieldType name="bmax_query" class="solr.TextField" indexed="false" stored="false">
+        <analyzer type="query">
+            <tokenizer class="solr.PatternTokenizerFactory" 
+                       pattern="[+;:,\s©®℗℠™&amp;()/\p{Punct}&lt;&gt;»«]+" />
+                                       
+            <!-- lower case -->
+            <filter class="solr.LowerCaseFilterFactory" />
+            
+            <!-- Removes stopwords from the query. -->
+            <filter class="solr.StopFilterFactory" 
+                    words="stopwords.txt" ignoreCase="true"/>
+        </analyzer>
+    </fieldType>
+
+This is a example of a synonym parser. The input is each token of the query analyzer above, one at a time. So, there's no need for any fancy tokenizing, the keyword tokenizer will do it. This analyzer chain utilizes the `SynonymFilter` and as a last step removes all non-synonyms. With this nifty little trick, no unneeded synonyms get added to your query.
+
+    <fieldType name="bmax_synonyms" class="solr.TextField" indexed="false" stored="false">
+         <analyzer type="query">
+            <tokenizer class="solr.KeywordTokenizerFactory" />
+            
+            <!-- synonyms -->
+            <filter class="solr.SynonymFilterFactory" synonyms="syn.txt" ignoreCase="true" expand="false"/>
+
+            <!-- remove all non-synonyms -->
+            <filter class="solr.TypeTokenFilterFactory" types="list_tokentype_synonym.txt" useWhitelist="true"/>
+         </analyzer>
+      </fieldType>
+
+For the boostterm field type, the `SynonymFilter` might be handy as well.
+
+## Using the query parser
 
     bmax.manipulateDocumentFrequencies
     bmax.manipulateTermFrequencies
-    
 
-### URL parameters
 
 ## Building the project
 
