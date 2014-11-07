@@ -29,13 +29,16 @@ The tokens emitted from the `queryParsingFieldType`s query analyzer are also put
 
 ### Building the query
 
-The tokens extracted from the configured field types are composed into a single lucene query.
+The tokens extracted from the configured field types are composed into a single lucene query. If we take the example above, the user query `blue pants cheap` is transformed into the tokens `blue` and `pants` (stopword *cheap* is removed). `pants` matches the synonym `jeans`, the boost up terms `denim` and `straight` and the penalize term `shoe`.
 
---> synonyms
+The following lucene query will be constructed:
 
---> boost up terms (weight)
-
---> rerank
+* `BooleanQuery` (`MUST` match) of
+   * `DismaxQuery` of (`blue`)
+   * `DismaxQuery` of (`pants`, `jeans`)
+* `BooleanQuery` (`SHOULD` match) of
+   * `DismaxQuery` of (`denim`, `straight`)
+* `ReReankQuery` of (`shoe`) for the first 400 docs with a configurable negative weight.
 
 ## Installing the component
 
@@ -44,6 +47,17 @@ The tokens extracted from the configured field types are composed into a single 
 * Configure at least one field type in your `schema.xml` that can be used for query parsing and tokenizing
 * Configure the `bmax` query parser in your `solrconfig.xml` (see below)
 * Enable the `bmax` query parser using the `defType=bmax` parameter in your query.
+
+This project is also vailable from Maven Central:
+
+    <dependency>
+        <groupId>com.s24.search.solr</groupId>
+        <artifactId>solr-bmax-queryparser</artifactId>
+        <version>0.9.2</version>
+        <classifier>jar-with-dependencies</classifier>
+        <scope>provided</scope>
+    </dependency>
+
 
 ## Configuring the query parser
 
@@ -93,15 +107,39 @@ For the boostterm field type, the `SynonymFilter` might be handy as well.
 
 ## Using the query parser
 
-    bmax.manipulateDocumentFrequencies
-    bmax.manipulateTermFrequencies
+The following url parameters are recognized:
+
+* `q` (string) – the user query. *Lucene query syntax is not supported.* The input is passed into the tokenizer as is: `q=blue pants cheap`.
+
+* `qf` (string) – the query fields with their weights: `qf=title^10.0 description^2`.
+
+* `bmax.boostDownTerm.enable` (boolean) – Enables penalize a.k.a boost down term lookup and application.
+
+* `bmax.boostDownTerm.weight` (float) – The factor to apply the rerank query with, always negative. Defaults to `-2.0`
+
+* `bmax.boostDownTerm.extra` (string) - A comma separated list of extra penalize terms to apply. Use this for testing.
+
+* `bmax.boostUpTerm.enable` (boolean) – Enables boost up term lookup and application. 
+
+* `bmax.boostUpTerm.extra`(string) – A comma separated list of extra boost terms to apply. Use this for testing.
+ 
+* `bmax.boostUpTerm.qf` (string) — if supplied, boost terms will be applied on these query fields and not on the query fields supplied in the `qf` parameter. Lucene field weights are supported. Defaults to values in the `qf` parameter.
+
+* `bmax.synonym.boost` (float) – When constructing the lucene queries, field weights are multiplicated with this synonym boost factor. Defaults to `0.01f`.
+
+* `bmax.synonym.extra` (string) – Supply extra synonyms in lucene synonym format, e.g. `shoe=>sneaker|clog,blue=>azure`. Use this for testing.
+
+Advanced users might like to experiment with some experimental features:
+
+* `bmax.manipulateDocumentFrequencies` (boolean, experimental) – Enables advanced manipulation of document frequencies. See [`BmaxLuceneQueryBuilder`](./src/main/java/com/s24/search/solr/query/bmax/BmaxLuceneQueryBuilder.java) for details. This will increase query parsing time by about factor 3! Defaults to `false`.
+
+* `bmax.manipulateTermFrequencies` (boolean, experimental) – Enables advanced manipulation of term frequencies. See [`BmaxLuceneQueryBuilder`](./src/main/java/com/s24/search/solr/query/bmax/BmaxLuceneQueryBuilder.java) for details. This will increase query parsing time by about factor 3! Defaults to `false`.
 
 
 ## Building the project
 
 This should install the current version into your local repository
 
-    $ export MAVEN_OPTS="-Dmaven.wagon.http.ssl.insecure=true -Dmaven.wagon.http.ssl.allowall=true -Dmaven.wagon.http.ssl.ignore.validity.dates=true"
     $ mvn clean install
     
 ### Releasing the project to maven central
@@ -123,6 +161,10 @@ Then, increment to next development version:
     $ mvn org.codehaus.mojo:versions-maven-plugin:2.0:set -DgenerateBackupPoms=false -DnewVersion=$NEXT_DEVELOPMENT_VERSION
     $ git commit -a -m "pushes to development version $NEXT_DEVELOPMENT_VERSION"
     $ git push origin tag v$NEXT_VERSION && git push origin
+
+## Contributing
+
+We're looking forward to your comments, issues and pull requests!
 
 ## License
 
