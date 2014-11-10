@@ -4,7 +4,7 @@
 	<groupId>com.s24.search.solr</groupId>
 	<artifactId>solr-bmax-queryparser</artifactId>
 	<name>solr-bmax-queryparser</name>
-	<version>0.9.3</version>
+	<version>0.9.4-SNAPSHOT</version>
 	<description>A boosting dismax query parser for Apache Solr</description>
 	<url>https://github.com/shopping24/solr-bmax-queryparser</url>
 	<licenses>
