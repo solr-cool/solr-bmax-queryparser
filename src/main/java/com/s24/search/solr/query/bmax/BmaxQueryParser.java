@@ -116,7 +116,7 @@ public class BmaxQueryParser extends ExtendedDismaxQParser {
                // add synonyms and extra synonyms
                if (synonymAnalyzer != null) {
                   query.getTermsAndSynonyms().get(term)
-                        .addAll(Sets.newHashSet(Terms.collect(qstr, synonymAnalyzer)));
+                        .addAll(Sets.newHashSet(Terms.collect(term, synonymAnalyzer)));
                }
                if (extraSynonyms.containsKey(term)) {
                   query.getTermsAndSynonyms().get(term).addAll(extraSynonyms.get(term));
@@ -138,7 +138,7 @@ public class BmaxQueryParser extends ExtendedDismaxQParser {
          // boost up and down terms
          if (boostUpTermEnabled) {
             if (boostUpAnalyzer != null) {
-               query.getBoostUpTerms().addAll(Sets.newHashSet(Terms.collect(qstr, boostUpAnalyzer)));
+               query.getBoostUpTerms().addAll(Sets.newHashSet(Terms.collect(getString(), boostUpAnalyzer)));
             }
 
             String boostUpTermExtra = getReq().getParams().get(PARAM_BOOST_UP_TERM_EXTRA);
@@ -149,7 +149,7 @@ public class BmaxQueryParser extends ExtendedDismaxQParser {
          }
          if (boostDownTermEnabled) {
             if (boostDownAnalyzer != null) {
-               query.getBoostDownTerms().addAll(Sets.newHashSet(Terms.collect(qstr, boostDownAnalyzer)));
+               query.getBoostDownTerms().addAll(Sets.newHashSet(Terms.collect(getString(), boostDownAnalyzer)));
             }
 
             String boostDownTermExtra = getReq().getParams().get(PARAM_BOOST_DOWN_TERM_EXTRA);
