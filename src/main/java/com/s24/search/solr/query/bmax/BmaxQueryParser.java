@@ -161,6 +161,7 @@ public class BmaxQueryParser extends ExtendedDismaxQParser {
 
          req.getContext().put("boostUpTerms", query.getBoostUpTerms());
          req.getContext().put("boostDownTerms", query.getBoostDownTerms());
+         req.getContext().put("queryTerms", query.getTermsAndSynonyms().keySet());
          req.getContext().put("synonyms", Sets.newHashSet(Iterables.concat(query.getTermsAndSynonyms().values())));
 
          // done
