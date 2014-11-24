@@ -29,8 +29,10 @@ public class BmaxQueryParser extends ExtendedDismaxQParser {
 
    public static final String PARAM_BOOST_DOWN_TERM_WEIGHT = "bmax.boostDownTerm.weight";
    public static final String PARAM_BOOST_DOWN_TERM_ENABLE = "bmax.boostDownTerm.enable";
+   public static final String PARAM_BOOST_DOWN_TERM_WITHSYNONYMS = "bmax.boostDownTerm.withsynonyms";
    public static final String PARAM_BOOST_DOWN_TERM_EXTRA = "bmax.boostDownTerm.extra";
    public static final String PARAM_BOOST_UP_TERM_ENABLE = "bmax.boostUpTerm.enable";
+   public static final String PARAM_BOOST_UP_TERM_WITHSYNONYMS = "bmax.boostUpTerm.withsynonyms";
    public static final String PARAM_BOOST_UP_TERM_QF = "bmax.boostUpTerm.qf";
    public static final String PARAM_BOOST_UP_TERM_EXTRA = "bmax.boostUpTerm.extra";
    public static final String PARAM_SYNONYM_BOOST = "bmax.synonym.boost";
@@ -48,7 +50,9 @@ public class BmaxQueryParser extends ExtendedDismaxQParser {
    private final float boostDownTermWeight;
    private final float synonymBoost;
    private final boolean boostDownTermEnabled;
+   private final boolean boostDownTermWithSynonyms;
    private final boolean boostUpTermEnabled;
+   private final boolean boostUpTermWithSynonyms;
 
    public BmaxQueryParser(String qstr, SolrParams localParams, SolrParams params, SolrQueryRequest req,
          Analyzer queryParsingAnalyzer, Analyzer synonymAnalyzer, Analyzer boostUpAnalyzer, Analyzer boostDownAnalyzer) {
@@ -62,7 +66,9 @@ public class BmaxQueryParser extends ExtendedDismaxQParser {
       this.boostUpAnalyzer = boostUpAnalyzer;
 
       this.boostDownTermEnabled = params.getBool(PARAM_BOOST_DOWN_TERM_ENABLE, true);
+      this.boostDownTermWithSynonyms = params.getBool(PARAM_BOOST_DOWN_TERM_WITHSYNONYMS, true);
       this.boostUpTermEnabled = params.getBool(PARAM_BOOST_UP_TERM_ENABLE, true);
+      this.boostUpTermWithSynonyms = params.getBool(PARAM_BOOST_UP_TERM_WITHSYNONYMS, true);
       this.boostDownTermWeight = -Math.abs(params.getFloat(PARAM_BOOST_DOWN_TERM_WEIGHT, 2.0f));
       this.synonymBoost = params.getFloat(PARAM_SYNONYM_BOOST, 0.01f);
    }
@@ -138,7 +144,13 @@ public class BmaxQueryParser extends ExtendedDismaxQParser {
          // boost up and down terms
          if (boostUpTermEnabled) {
             if (boostUpAnalyzer != null) {
-               query.getBoostUpTerms().addAll(Sets.newHashSet(Terms.collect(getString(), boostUpAnalyzer)));
+               String boostInput = getString();
+
+               if (boostUpTermWithSynonyms) {
+                  boostInput += " " + Joiner.on(' ').join(Iterables.concat(query.getTermsAndSynonyms().values()));
+               }
+
+               query.getBoostUpTerms().addAll(Sets.newHashSet(Terms.collect(boostInput, boostUpAnalyzer)));
             }
 
             String boostUpTermExtra = getReq().getParams().get(PARAM_BOOST_UP_TERM_EXTRA);
@@ -149,7 +161,13 @@ public class BmaxQueryParser extends ExtendedDismaxQParser {
          }
          if (boostDownTermEnabled) {
             if (boostDownAnalyzer != null) {
-               query.getBoostDownTerms().addAll(Sets.newHashSet(Terms.collect(getString(), boostDownAnalyzer)));
+               String boostInput = getString();
+
+               if (boostDownTermWithSynonyms) {
+                  boostInput += " " + Joiner.on(' ').join(Iterables.concat(query.getTermsAndSynonyms().values()));
+               }
+
+               query.getBoostDownTerms().addAll(Sets.newHashSet(Terms.collect(boostInput, boostDownAnalyzer)));
             }
 
             String boostDownTermExtra = getReq().getParams().get(PARAM_BOOST_DOWN_TERM_EXTRA);
