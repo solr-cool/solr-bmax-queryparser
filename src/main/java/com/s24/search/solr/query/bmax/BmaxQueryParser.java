@@ -58,9 +58,11 @@ public class BmaxQueryParser extends ExtendedDismaxQParser {
          Analyzer queryParsingAnalyzer, Analyzer synonymAnalyzer, Analyzer boostUpAnalyzer, Analyzer boostDownAnalyzer) {
       super(qstr, localParams, params, req);
 
+      // mandatory
       checkNotNull(queryParsingAnalyzer, "Pre-condition violated: queryParsingAnalyzer must not be null.");
-
       this.queryParsingAnalyzer = queryParsingAnalyzer;
+      
+      // optional
       this.synonymAnalyzer = synonymAnalyzer;
       this.boostDownAnalyzer = boostDownAnalyzer;
       this.boostUpAnalyzer = boostUpAnalyzer;

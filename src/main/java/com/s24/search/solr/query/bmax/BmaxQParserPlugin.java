@@ -35,11 +35,15 @@ public class BmaxQParserPlugin extends QParserPlugin {
 
    @Override
    public void init(@SuppressWarnings("rawtypes") NamedList args) {
+      checkNotNull(args, "Pre-condition violated: args must not be null.");
+      
+      // mandatory
+      queryParsingFieldType = checkNotNull((String) args.get("queryParsingFieldType"), "No queryParsingFieldType given. Aborting.");
 
-      boostUpFieldType = checkNotNull((String) args.get("boostUpFieldType"));
-      boostDownFieldType = checkNotNull((String) args.get("boostDownFieldType"));
-      queryParsingFieldType = checkNotNull((String) args.get("queryParsingFieldType"));
-      synonymFieldType = checkNotNull((String) args.get("synonymFieldType"));
+      // optional
+      boostUpFieldType = (String) args.get("boostUpFieldType");
+      boostDownFieldType = (String) args.get("boostDownFieldType");
+      synonymFieldType = (String) args.get("synonymFieldType");
    }
 
    @Override
