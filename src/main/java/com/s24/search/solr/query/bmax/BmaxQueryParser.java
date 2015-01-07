@@ -11,6 +11,7 @@ import java.util.Set;
 
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.search.Query;
+import org.apache.solr.common.params.CommonParams;
 import org.apache.solr.common.params.DisMaxParams;
 import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.params.SolrParams;
@@ -53,6 +54,7 @@ public class BmaxQueryParser extends ExtendedDismaxQParser {
    private final boolean boostDownTermWithSynonyms;
    private final boolean boostUpTermEnabled;
    private final boolean boostUpTermWithSynonyms;
+   private final boolean explicitSortEnabled;
 
    public BmaxQueryParser(String qstr, SolrParams localParams, SolrParams params, SolrQueryRequest req,
          Analyzer queryParsingAnalyzer, Analyzer synonymAnalyzer, Analyzer boostUpAnalyzer, Analyzer boostDownAnalyzer) {
@@ -61,7 +63,7 @@ public class BmaxQueryParser extends ExtendedDismaxQParser {
       // mandatory
       checkNotNull(queryParsingAnalyzer, "Pre-condition violated: queryParsingAnalyzer must not be null.");
       this.queryParsingAnalyzer = queryParsingAnalyzer;
-      
+
       // optional
       this.synonymAnalyzer = synonymAnalyzer;
       this.boostDownAnalyzer = boostDownAnalyzer;
@@ -73,6 +75,10 @@ public class BmaxQueryParser extends ExtendedDismaxQParser {
       this.boostUpTermWithSynonyms = params.getBool(PARAM_BOOST_UP_TERM_WITHSYNONYMS, true);
       this.boostDownTermWeight = -Math.abs(params.getFloat(PARAM_BOOST_DOWN_TERM_WEIGHT, 2.0f));
       this.synonymBoost = params.getFloat(PARAM_SYNONYM_BOOST, 0.01f);
+
+      // check sort
+      String sort = params.get(CommonParams.SORT, "score desc").toLowerCase();
+      this.explicitSortEnabled = !sort.contains("score");
    }
 
    @Override
@@ -132,55 +138,60 @@ public class BmaxQueryParser extends ExtendedDismaxQParser {
             }
          }
 
-         // extract separate boost fields and their boosts
-         if (boostUpTermEnabled || boostDownTermEnabled) {
-            Map<String, Float> boostFieldsAndBoosts = SolrPluginUtils.parseFieldBoosts(getReq().getParams().getParams(
-                  PARAM_BOOST_UP_TERM_QF));
-            if (boostFieldsAndBoosts.isEmpty()) {
-               query.getBoostFieldsAndBoosts().putAll(query.getFieldsAndBoosts());
-            } else {
-               query.getBoostFieldsAndBoosts().putAll(boostFieldsAndBoosts);
+         // evaluate boostterms only if explicit sort is not given
+         if (!explicitSortEnabled) {
+
+            // extract separate boost fields and their boosts
+            if (boostUpTermEnabled || boostDownTermEnabled) {
+               Map<String, Float> boostFieldsAndBoosts = SolrPluginUtils.parseFieldBoosts(getReq().getParams()
+                     .getParams(
+                           PARAM_BOOST_UP_TERM_QF));
+               if (boostFieldsAndBoosts.isEmpty()) {
+                  query.getBoostFieldsAndBoosts().putAll(query.getFieldsAndBoosts());
+               } else {
+                  query.getBoostFieldsAndBoosts().putAll(boostFieldsAndBoosts);
+               }
             }
-         }
 
-         // boost up and down terms
-         if (boostUpTermEnabled) {
-            if (boostUpAnalyzer != null) {
-               String boostInput = getString();
+            // boost up and down terms
+            if (boostUpTermEnabled) {
+               if (boostUpAnalyzer != null) {
+                  String boostInput = getString();
 
-               if (boostUpTermWithSynonyms) {
-                  boostInput += " " + Joiner.on(' ').join(Iterables.concat(query.getTermsAndSynonyms().values()));
+                  if (boostUpTermWithSynonyms) {
+                     boostInput += " " + Joiner.on(' ').join(Iterables.concat(query.getTermsAndSynonyms().values()));
+                  }
+
+                  query.getBoostUpTerms().addAll(Sets.newHashSet(Terms.collect(boostInput, boostUpAnalyzer)));
                }
 
-               query.getBoostUpTerms().addAll(Sets.newHashSet(Terms.collect(boostInput, boostUpAnalyzer)));
+               String boostUpTermExtra = getReq().getParams().get(PARAM_BOOST_UP_TERM_EXTRA);
+               if (boostUpTermExtra != null) {
+                  query.getBoostUpTerms().addAll(
+                        Sets.newHashSet(Splitter.on(',').omitEmptyStrings().split(boostUpTermExtra)));
+               }
             }
+            if (boostDownTermEnabled) {
+               if (boostDownAnalyzer != null) {
+                  String boostInput = getString();
 
-            String boostUpTermExtra = getReq().getParams().get(PARAM_BOOST_UP_TERM_EXTRA);
-            if (boostUpTermExtra != null) {
-               query.getBoostUpTerms().addAll(
-                     Sets.newHashSet(Splitter.on(',').omitEmptyStrings().split(boostUpTermExtra)));
-            }
-         }
-         if (boostDownTermEnabled) {
-            if (boostDownAnalyzer != null) {
-               String boostInput = getString();
+                  if (boostDownTermWithSynonyms) {
+                     boostInput += " " + Joiner.on(' ').join(Iterables.concat(query.getTermsAndSynonyms().values()));
+                  }
 
-               if (boostDownTermWithSynonyms) {
-                  boostInput += " " + Joiner.on(' ').join(Iterables.concat(query.getTermsAndSynonyms().values()));
+                  query.getBoostDownTerms().addAll(Sets.newHashSet(Terms.collect(boostInput, boostDownAnalyzer)));
                }
 
-               query.getBoostDownTerms().addAll(Sets.newHashSet(Terms.collect(boostInput, boostDownAnalyzer)));
+               String boostDownTermExtra = getReq().getParams().get(PARAM_BOOST_DOWN_TERM_EXTRA);
+               if (boostDownTermExtra != null) {
+                  query.getBoostDownTerms().addAll(
+                        Sets.newHashSet(Splitter.on(',').omitEmptyStrings().split(boostDownTermExtra)));
+               }
             }
 
-            String boostDownTermExtra = getReq().getParams().get(PARAM_BOOST_DOWN_TERM_EXTRA);
-            if (boostDownTermExtra != null) {
-               query.getBoostDownTerms().addAll(
-                     Sets.newHashSet(Splitter.on(',').omitEmptyStrings().split(boostDownTermExtra)));
-            }
+            req.getContext().put("boostUpTerms", query.getBoostUpTerms());
+            req.getContext().put("boostDownTerms", query.getBoostDownTerms());
          }
-
-         req.getContext().put("boostUpTerms", query.getBoostUpTerms());
-         req.getContext().put("boostDownTerms", query.getBoostDownTerms());
          req.getContext().put("queryTerms", query.getTermsAndSynonyms().keySet());
          req.getContext().put("synonyms", Sets.newHashSet(Iterables.concat(query.getTermsAndSynonyms().values())));
 
