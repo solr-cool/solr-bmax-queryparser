@@ -24,6 +24,7 @@ import org.apache.lucene.search.TermQuery;
 import org.apache.solr.schema.IndexSchema;
 import org.apache.solr.search.SolrIndexSearcher;
 
+import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 
 /**
@@ -97,8 +98,16 @@ public class BmaxLuceneQueryBuilder {
       BooleanQuery bq = new BooleanQuery(true);
 
       // iterate terms
-      for (Entry<String, Set<String>> term : bmaxquery.getTermsAndSynonyms().entrySet()) {
+      for (Entry<CharSequence, Set<CharSequence>> termAndSynonyms : bmaxquery.getTermsAndSynonyms().entrySet()) {
 
+         // create new entry to use in following functions
+         Entry<CharSequence, Set<CharSequence>> term = Maps.immutableEntry(termAndSynonyms.getKey(), (Set<CharSequence>) Sets.newHashSet(termAndSynonyms.getValue()));
+         
+         // add subtopics
+         if (bmaxquery.getTermsAndSubtopics().containsKey(termAndSynonyms.getKey())) {
+            term.getValue().addAll(bmaxquery.getTermsAndSubtopics().get(termAndSynonyms.getKey()));
+         }
+         
          // append dismax query as clause
          bq.add(new BooleanClause(buildDismaxQuery(term), Occur.MUST));
       }
@@ -120,13 +129,13 @@ public class BmaxLuceneQueryBuilder {
    /**
     * Builds a boost query
     */
-   protected Collection<BooleanClause> buildBoostQueryClauses(Collection<String> boostTerms) {
+   protected Collection<BooleanClause> buildBoostQueryClauses(Collection<CharSequence> boostTerms) {
       checkNotNull(boostTerms, "Pre-condition violated: boostTerms must not be null.");
 
       Collection<BooleanClause> clauses = Sets.newHashSet();
 
       // compute a single dismax clause for every term
-      for (String term : boostTerms) {
+      for (CharSequence term : boostTerms) {
          clauses.add(new BooleanClause(buildBoostQueryDismaxFieldClause(term, BOOST_QUERY_FIELD_BOOST), Occur.SHOULD));
       }
 
@@ -136,7 +145,7 @@ public class BmaxLuceneQueryBuilder {
    /**
     * Transforms the given input into valid field terms
     */
-   protected Query buildBoostQueryDismaxFieldClause(String term, float extraBoost) {
+   protected Query buildBoostQueryDismaxFieldClause(CharSequence term, float extraBoost) {
       checkNotNull(term, "Pre-condition violated: field must not be null.");
 
       DisjunctionMaxQuery dmq = new DisjunctionMaxQuery(0);
@@ -181,7 +190,7 @@ public class BmaxLuceneQueryBuilder {
     * Builds a dismax query for the given terms and their corresponding
     * synonyms.
     */
-   protected Query buildDismaxQuery(Entry<String, Set<String>> termWithSynonyms) {
+   protected Query buildDismaxQuery(Entry<CharSequence, Set<CharSequence>> termWithSynonyms) {
       checkNotNull(termWithSynonyms, "Pre-condition violated: termWithSynonyms must not be null.");
 
       DisjunctionMaxQuery dmq = new DisjunctionMaxQuery(0);
@@ -198,7 +207,7 @@ public class BmaxLuceneQueryBuilder {
 
          // collect terms
          Set<Term> synonyms = Sets.newHashSet();
-         for (String t : termWithSynonyms.getValue()) {
+         for (CharSequence t : termWithSynonyms.getValue()) {
             synonyms.addAll(Terms.collectTerms(t, analyzer, field));
          }
 

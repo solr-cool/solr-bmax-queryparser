@@ -46,6 +46,7 @@ public class BmaxQueryParser extends ExtendedDismaxQParser {
    private final Analyzer boostUpAnalyzer;
    private final Analyzer boostDownAnalyzer;
    private final Analyzer synonymAnalyzer;
+   private final Analyzer subtopicAnalyzer;
    private final Analyzer queryParsingAnalyzer;
 
    private final float boostDownTermWeight;
@@ -56,8 +57,23 @@ public class BmaxQueryParser extends ExtendedDismaxQParser {
    private final boolean boostUpTermWithSynonyms;
    private final boolean explicitSortEnabled;
 
+   /**
+    * Creates a new {@linkplain BmaxQueryParser}.
+    * 
+    * @param qstr
+    *           the original input query string
+    * @param queryParsingAnalyzer
+    *           the analyzer to parse the query with.
+    * @param synonymAnalyzer
+    *           the analyzer to parse synonyms out of the outcome of the
+    *           <code>queryParsingAnalyzer</code>
+    * @param subtopicAnalyzer
+    * @param boostUpAnalyzer
+    * @param boostDownAnalyzer
+    */
    public BmaxQueryParser(String qstr, SolrParams localParams, SolrParams params, SolrQueryRequest req,
-         Analyzer queryParsingAnalyzer, Analyzer synonymAnalyzer, Analyzer boostUpAnalyzer, Analyzer boostDownAnalyzer) {
+         Analyzer queryParsingAnalyzer, Analyzer synonymAnalyzer, Analyzer subtopicAnalyzer,
+         Analyzer boostUpAnalyzer, Analyzer boostDownAnalyzer) {
       super(qstr, localParams, params, req);
 
       // mandatory
@@ -66,6 +82,7 @@ public class BmaxQueryParser extends ExtendedDismaxQParser {
 
       // optional
       this.synonymAnalyzer = synonymAnalyzer;
+      this.subtopicAnalyzer = subtopicAnalyzer;
       this.boostDownAnalyzer = boostDownAnalyzer;
       this.boostUpAnalyzer = boostUpAnalyzer;
 
@@ -122,18 +139,25 @@ public class BmaxQueryParser extends ExtendedDismaxQParser {
             // get extra synonyms
             Map<String, Set<String>> extraSynonyms = parseExtraSynonyms(getReq().getParams().get(PARAM_SYNONYM_EXTRA));
 
-            for (String term : Terms.collect(getString(), queryParsingAnalyzer)) {
+            for (CharSequence term : Terms.collect(getString(), queryParsingAnalyzer)) {
 
                // add term
-               query.getTermsAndSynonyms().put(term, new HashSet<String>());
+               query.getTermsAndSynonyms().put(term, new HashSet<CharSequence>());
 
                // add synonyms and extra synonyms
                if (synonymAnalyzer != null) {
                   query.getTermsAndSynonyms().get(term)
                         .addAll(Sets.newHashSet(Terms.collect(term, synonymAnalyzer)));
                }
+
+               // add extra synonyms from request
                if (extraSynonyms.containsKey(term)) {
                   query.getTermsAndSynonyms().get(term).addAll(extraSynonyms.get(term));
+               }
+
+               // add subtopics
+               if (subtopicAnalyzer != null) {
+                  query.getTermsAndSubtopics().put(term, Sets.newHashSet(Terms.collect(term, subtopicAnalyzer)));
                }
             }
          }
@@ -194,6 +218,7 @@ public class BmaxQueryParser extends ExtendedDismaxQParser {
          }
          req.getContext().put("queryTerms", query.getTermsAndSynonyms().keySet());
          req.getContext().put("synonyms", Sets.newHashSet(Iterables.concat(query.getTermsAndSynonyms().values())));
+         req.getContext().put("subtopics", Sets.newHashSet(Iterables.concat(query.getTermsAndSubtopics().values())));
 
          // done
          return query;
@@ -208,7 +233,7 @@ public class BmaxQueryParser extends ExtendedDismaxQParser {
             "Pre-condition violated: expression getParams() instanceof ModifiableSolrParams must be true.");
 
       // collect penalize terms
-      Collection<String> terms = query.getBoostDownTerms();
+      Collection<CharSequence> terms = query.getBoostDownTerms();
 
       if (!terms.isEmpty()) {
 

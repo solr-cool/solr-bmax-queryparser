@@ -7,24 +7,29 @@ import java.util.Set;
 
 public class BmaxQuery {
 
-   private final Map<String, Set<String>> termsAndSynonyms = new HashMap<String, Set<String>>();
-   private final Set<String> boostUpTerms = new HashSet<String>();
-   private final Set<String> boostDownTerms = new HashSet<String>();
+   private final Map<CharSequence, Set<CharSequence>> termsAndSynonyms = new HashMap<CharSequence, Set<CharSequence>>();
+   private final Map<CharSequence, Set<CharSequence>> termsAndSubtopics = new HashMap<CharSequence, Set<CharSequence>>();
+   private final Set<CharSequence> boostUpTerms = new HashSet<CharSequence>();
+   private final Set<CharSequence> boostDownTerms = new HashSet<CharSequence>();
    private final Map<String, Float> fieldsAndBoosts = new HashMap<String, Float>();
    private final Map<String, Float> boostFieldsAndBoosts = new HashMap<String, Float>();
    private float synonymBoost = 0.01f;
    private boolean manipulateDocumentFrequencies = true;
    private boolean manipulateTermFrequencies = true;
 
-   public Map<String, Set<String>> getTermsAndSynonyms() {
+   public Map<CharSequence, Set<CharSequence>> getTermsAndSynonyms() {
       return termsAndSynonyms;
    }
 
-   public Set<String> getBoostUpTerms() {
+   public Map<CharSequence, Set<CharSequence>> getTermsAndSubtopics() {
+      return termsAndSubtopics;
+   }
+
+   public Set<CharSequence> getBoostUpTerms() {
       return boostUpTerms;
    }
 
-   public Set<String> getBoostDownTerms() {
+   public Set<CharSequence> getBoostDownTerms() {
       return boostDownTerms;
    }
 

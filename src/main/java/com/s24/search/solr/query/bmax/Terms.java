@@ -11,6 +11,7 @@ import org.apache.lucene.analysis.TokenStream;
 import org.apache.lucene.analysis.tokenattributes.CharTermAttribute;
 import org.apache.lucene.analysis.tokenattributes.TermToBytesRefAttribute;
 import org.apache.lucene.index.Term;
+import org.apache.lucene.util.AttributeImpl;
 import org.apache.lucene.util.BytesRef;
 import org.apache.solr.search.SolrIndexSearcher;
 import org.apache.solr.util.SolrPluginUtils;
@@ -33,11 +34,11 @@ public class Terms {
     *           Analyzer.
     * @return All terms from the resulting token stream.
     */
-   public static Collection<String> collect(CharSequence input, Analyzer analyzer) {
+   public static Collection<CharSequence> collect(CharSequence input, Analyzer analyzer) {
       checkNotNull(input, "Pre-condition violated: input must not be null.");
       checkNotNull(analyzer, "Pre-condition violated: analyzer must not be null.");
 
-      Collection<String> result = Lists.newArrayList();
+      Collection<CharSequence> result = Lists.newArrayList();
       TokenStream tokenStream = null;
       try {
          tokenStream = analyzer.tokenStream("bmax", new CharSequenceReader(input));
@@ -47,7 +48,7 @@ public class Terms {
          while (tokenStream.incrementToken()) {
             // Needs to converted to string, because on tokenStream.end()
             // the charTermAttribute will be flushed.
-            result.add(charTermAttribute.toString());
+            result.add((CharSequence) ((AttributeImpl) charTermAttribute).clone());
          }
 
       } catch (IOException e) {

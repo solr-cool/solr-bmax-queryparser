@@ -30,6 +30,9 @@ public class BmaxQParserPlugin extends QParserPlugin {
    private String synonymFieldType;
    private Analyzer synonymAnalyzer;
 
+   private String subtopicFieldType;
+   private Analyzer subtopicAnalyzer;
+
    private String queryParsingFieldType;
    private Analyzer queryParsingAnalyzer;
 
@@ -44,6 +47,7 @@ public class BmaxQParserPlugin extends QParserPlugin {
       boostUpFieldType = (String) args.get("boostUpFieldType");
       boostDownFieldType = (String) args.get("boostDownFieldType");
       synonymFieldType = (String) args.get("synonymFieldType");
+      subtopicFieldType = (String) args.get("subtopicFieldType");
    }
 
    @Override
@@ -61,6 +65,8 @@ public class BmaxQParserPlugin extends QParserPlugin {
                .getQueryAnalyzer() : null;
          this.synonymAnalyzer = (synonymFieldType != null) ? req.getSchema().getFieldTypeByName(synonymFieldType)
                .getQueryAnalyzer() : null;
+         this.subtopicAnalyzer = (subtopicFieldType != null) ? req.getSchema().getFieldTypeByName(subtopicFieldType)
+                     .getQueryAnalyzer() : null;
       }
       checkNotNull(queryParsingAnalyzer, "Pre-condition violated: queryParsingAnalyzer must not be null.");
 
@@ -71,7 +77,8 @@ public class BmaxQParserPlugin extends QParserPlugin {
          req.setParams(new ModifiableSolrParams(req.getParams()));
       } 
       
-      return new BmaxQueryParser(qstr, localParams, req.getParams(), req, queryParsingAnalyzer, synonymAnalyzer,
+      return new BmaxQueryParser(qstr, localParams, req.getParams(), req, queryParsingAnalyzer, 
+            synonymAnalyzer, subtopicAnalyzer,
             boostUpAnalyzer, boostDownAnalyzer);
    }
 }
