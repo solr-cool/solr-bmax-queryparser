@@ -1,0 +1,49 @@
+<?xml version="1.0" ?>
+<schema name="minimal test schema" version="1.5">
+
+    <fieldType name="text" class="solr.TextField"
+        positionIncrementGap="100">
+        <analyzer>
+            <tokenizer class="solr.WhitespaceTokenizerFactory" />
+        </analyzer>
+    </fieldType>
+    
+    <!-- bmax field types -->
+    <fieldType name="bmax_query" class="solr.TextField" indexed="false" stored="false">
+         <analyzer type="query">
+            <tokenizer class="solr.WhitespaceTokenizerFactory" />
+            <filter class="solr.PatternReplaceFilterFactory" pattern="solr" replacement="solr-query" />
+         </analyzer>
+    </fieldType>
+    <fieldType name="bmax_synonyms" class="solr.TextField" indexed="false" stored="false">
+         <analyzer type="query">
+            <tokenizer class="solr.WhitespaceTokenizerFactory" />
+            <filter class="solr.PatternReplaceFilterFactory" pattern="solr" replacement="solr-synonyms" />
+         </analyzer>
+    </fieldType>
+    <fieldType name="bmax_subtopics" class="solr.TextField" indexed="false" stored="false">
+         <analyzer type="query">
+            <tokenizer class="solr.WhitespaceTokenizerFactory" />
+            <filter class="solr.PatternReplaceFilterFactory" pattern="solr" replacement="solr-subtopics" />
+         </analyzer>
+    </fieldType>
+    <fieldType name="bmax_boostterms" class="solr.TextField" indexed="false" stored="false">
+         <analyzer type="query">
+            <tokenizer class="solr.WhitespaceTokenizerFactory" />
+            <filter class="solr.PatternReplaceFilterFactory" pattern="solr" replacement="solr-boostterms" />
+         </analyzer>
+    </fieldType>
+    <fieldType name="bmax_penalizeterms" class="solr.TextField" indexed="false" stored="false">
+         <analyzer type="query">
+            <tokenizer class="solr.WhitespaceTokenizerFactory" />
+            <filter class="solr.PatternReplaceFilterFactory" pattern="solr" replacement="solr-penalizeterms" />
+         </analyzer>
+    </fieldType>
+
+    <field name="id" type="text" indexed="true" stored="true"
+        multiValued="false" required="true" />
+
+    <uniqueKey>id</uniqueKey>
+
+</schema>
+
