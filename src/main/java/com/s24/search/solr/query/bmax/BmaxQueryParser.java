@@ -1,9 +1,7 @@
 package com.s24.search.solr.query.bmax;
 
-import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 
-import java.util.Collection;
 import java.util.HashSet;
 import java.util.Locale;
 import java.util.Map;
@@ -13,7 +11,6 @@ import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.search.Query;
 import org.apache.solr.common.params.CommonParams;
 import org.apache.solr.common.params.DisMaxParams;
-import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.params.SolrParams;
 import org.apache.solr.request.SolrQueryRequest;
 import org.apache.solr.search.ExtendedDismaxQParser;
@@ -94,16 +91,13 @@ public class BmaxQueryParser extends ExtendedDismaxQParser {
       this.synonymBoost = params.getFloat(PARAM_SYNONYM_BOOST, 0.01f);
 
       // check sort
-      String sort = params.get(CommonParams.SORT, "score desc").toLowerCase();
+      String sort = params.get(CommonParams.SORT, "score desc").toLowerCase(Locale.US);
       this.explicitSortEnabled = !sort.contains("score");
    }
 
    @Override
    public Query parse() throws SyntaxError {
       BmaxQuery query = analyzeQuery();
-
-      // handle boost down via rerank plugin
-      appendRerankParameters(query);
 
       // create query
       return new BmaxLuceneQueryBuilder(query)
@@ -195,27 +189,9 @@ public class BmaxQueryParser extends ExtendedDismaxQParser {
                         Sets.newHashSet(Splitter.on(',').omitEmptyStrings().split(boostUpTermExtra)));
                }
             }
-            if (boostDownTermEnabled) {
-               if (boostDownAnalyzer != null) {
-                  String boostInput = getString();
-
-                  if (boostDownTermWithSynonyms) {
-                     boostInput += " " + Joiner.on(' ').join(Iterables.concat(query.getTermsAndSynonyms().values()));
-                  }
-
-                  query.getBoostDownTerms().addAll(Sets.newHashSet(Terms.collect(boostInput, boostDownAnalyzer)));
-               }
-
-               String boostDownTermExtra = getReq().getParams().get(PARAM_BOOST_DOWN_TERM_EXTRA);
-               if (boostDownTermExtra != null) {
-                  query.getBoostDownTerms().addAll(
-                        Sets.newHashSet(Splitter.on(',').omitEmptyStrings().split(boostDownTermExtra)));
-               }
-            }
-
             req.getContext().put("boostUpTerms", query.getBoostUpTerms());
-            req.getContext().put("boostDownTerms", query.getBoostDownTerms());
          }
+
          req.getContext().put("queryTerms", query.getTermsAndSynonyms().keySet());
          req.getContext().put("synonyms", Sets.newHashSet(Iterables.concat(query.getTermsAndSynonyms().values())));
          req.getContext().put("subtopics", Sets.newHashSet(Iterables.concat(query.getTermsAndSubtopics().values())));
@@ -224,40 +200,6 @@ public class BmaxQueryParser extends ExtendedDismaxQParser {
          return query;
       } catch (Exception e) {
          throw new RuntimeException(e);
-      }
-   }
-
-   protected void appendRerankParameters(BmaxQuery query) {
-      checkNotNull(query, "Pre-condition violated: query must not be null.");
-      checkArgument(getParams() instanceof ModifiableSolrParams,
-            "Pre-condition violated: expression getParams() instanceof ModifiableSolrParams must be true.");
-
-      // collect penalize terms
-      Collection<CharSequence> terms = query.getBoostDownTerms();
-
-      if (!terms.isEmpty()) {
-
-         // join terms once. save cpu.
-         String joinedTerms = Joiner.on(" OR ").join(terms);
-
-         // add control local params
-         ((ModifiableSolrParams) getParams()).add("rq", String.format(Locale.US,
-               "{!rerank reRankQuery=$rqq reRankDocs=400 reRankWeight=%.1f}", boostDownTermWeight));
-
-         // create rerank query
-         StringBuilder rerank = new StringBuilder();
-         for (String field : query.getFieldsAndBoosts().keySet()) {
-            if (rerank.length() > 0) {
-               rerank.append(" OR ");
-            }
-
-            rerank.append(field);
-            rerank.append(":(");
-            rerank.append(joinedTerms);
-            rerank.append(')');
-         }
-
-         ((ModifiableSolrParams) getParams()).add("rqq", rerank.toString());
       }
    }
 
