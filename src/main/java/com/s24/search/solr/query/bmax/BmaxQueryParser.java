@@ -3,13 +3,11 @@ package com.s24.search.solr.query.bmax;
 import static com.google.common.base.Preconditions.checkNotNull;
 
 import java.util.HashSet;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.search.Query;
-import org.apache.solr.common.params.CommonParams;
 import org.apache.solr.common.params.DisMaxParams;
 import org.apache.solr.common.params.SolrParams;
 import org.apache.solr.request.SolrQueryRequest;
@@ -17,42 +15,23 @@ import org.apache.solr.search.ExtendedDismaxQParser;
 import org.apache.solr.search.SyntaxError;
 import org.apache.solr.util.SolrPluginUtils;
 
-import com.google.common.base.Joiner;
 import com.google.common.base.Splitter;
-import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
+import com.s24.search.solr.util.BmaxDebugInfo;
 
 public class BmaxQueryParser extends ExtendedDismaxQParser {
 
-   public static final String PARAM_BOOST_DOWN_TERM_WEIGHT = "bmax.boostDownTerm.weight";
-   public static final String PARAM_BOOST_DOWN_TERM_ENABLE = "bmax.boostDownTerm.enable";
-   public static final String PARAM_BOOST_DOWN_TERM_WITHSYNONYMS = "bmax.boostDownTerm.withsynonyms";
-   public static final String PARAM_BOOST_DOWN_TERM_EXTRA = "bmax.boostDownTerm.extra";
-   public static final String PARAM_BOOST_UP_TERM_ENABLE = "bmax.boostUpTerm.enable";
-   public static final String PARAM_BOOST_UP_TERM_WITHSYNONYMS = "bmax.boostUpTerm.withsynonyms";
-   public static final String PARAM_BOOST_UP_TERM_QF = "bmax.boostUpTerm.qf";
-   public static final String PARAM_BOOST_UP_TERM_EXTRA = "bmax.boostUpTerm.extra";
    public static final String PARAM_SYNONYM_BOOST = "bmax.synonym.boost";
    public static final String PARAM_SYNONYM_EXTRA = "bmax.synonym.extra";
-   public static final String PARAM_MANIPULATE_DOCUMENT_FREQUENCIES = "bmax.manipulateDocumentFrequencies";
-   public static final String PARAM_MANIPULATE_TERM_FREQUENCIES = "bmax.manipulateTermFrequencies";
 
    private static final String WILDCARD = "*:*";
 
-   private final Analyzer boostUpAnalyzer;
-   private final Analyzer boostDownAnalyzer;
    private final Analyzer synonymAnalyzer;
    private final Analyzer subtopicAnalyzer;
    private final Analyzer queryParsingAnalyzer;
 
-   private final float boostDownTermWeight;
    private final float synonymBoost;
-   private final boolean boostDownTermEnabled;
-   private final boolean boostDownTermWithSynonyms;
-   private final boolean boostUpTermEnabled;
-   private final boolean boostUpTermWithSynonyms;
-   private final boolean explicitSortEnabled;
 
    /**
     * Creates a new {@linkplain BmaxQueryParser}.
@@ -69,41 +48,35 @@ public class BmaxQueryParser extends ExtendedDismaxQParser {
     * @param boostDownAnalyzer
     */
    public BmaxQueryParser(String qstr, SolrParams localParams, SolrParams params, SolrQueryRequest req,
-         Analyzer queryParsingAnalyzer, Analyzer synonymAnalyzer, Analyzer subtopicAnalyzer,
-         Analyzer boostUpAnalyzer, Analyzer boostDownAnalyzer) {
+         Analyzer queryParsingAnalyzer, Analyzer synonymAnalyzer, Analyzer subtopicAnalyzer) {
       super(qstr, localParams, params, req);
 
       // mandatory
       checkNotNull(queryParsingAnalyzer, "Pre-condition violated: queryParsingAnalyzer must not be null.");
       this.queryParsingAnalyzer = queryParsingAnalyzer;
 
-      // optional
+      // optional args
       this.synonymAnalyzer = synonymAnalyzer;
       this.subtopicAnalyzer = subtopicAnalyzer;
-      this.boostDownAnalyzer = boostDownAnalyzer;
-      this.boostUpAnalyzer = boostUpAnalyzer;
 
-      this.boostDownTermEnabled = params.getBool(PARAM_BOOST_DOWN_TERM_ENABLE, true);
-      this.boostDownTermWithSynonyms = params.getBool(PARAM_BOOST_DOWN_TERM_WITHSYNONYMS, true);
-      this.boostUpTermEnabled = params.getBool(PARAM_BOOST_UP_TERM_ENABLE, true);
-      this.boostUpTermWithSynonyms = params.getBool(PARAM_BOOST_UP_TERM_WITHSYNONYMS, true);
-      this.boostDownTermWeight = -Math.abs(params.getFloat(PARAM_BOOST_DOWN_TERM_WEIGHT, 2.0f));
+      // collect params
       this.synonymBoost = params.getFloat(PARAM_SYNONYM_BOOST, 0.01f);
-
-      // check sort
-      String sort = params.get(CommonParams.SORT, "score desc").toLowerCase(Locale.US);
-      this.explicitSortEnabled = !sort.contains("score");
    }
 
    @Override
    public Query parse() throws SyntaxError {
       BmaxQuery query = analyzeQuery();
 
+      // save debug stuff
+      if (BmaxDebugInfo.isDebug(getReq())) {
+         getReq().getContext().put("bmaxQuery", query);
+      }
+
       // create query
       return new BmaxLuceneQueryBuilder(query)
             .withMultiplicativeBoost(getMultiplicativeBoosts())
+            .withBoostQueries(getBoostQueries())
             .withSchema(getReq().getSchema())
-            .withIndexSearcher(getReq().getSearcher())
             .build();
    }
 
@@ -112,8 +85,6 @@ public class BmaxQueryParser extends ExtendedDismaxQParser {
 
       // transfer parameters
       query.setSynonymBoost(synonymBoost);
-      query.setManipulateTermFrequencies(getReq().getParams().getBool(PARAM_MANIPULATE_TERM_FREQUENCIES, false));
-      query.setManipulateDocumentFrequencies(getReq().getParams().getBool(PARAM_MANIPULATE_DOCUMENT_FREQUENCIES, false));
 
       try {
          // extract fields and boost
@@ -149,52 +120,13 @@ public class BmaxQueryParser extends ExtendedDismaxQParser {
                   query.getTermsAndSynonyms().get(term).addAll(extraSynonyms.get(term));
                }
 
-               // add subtopics
+               // add subtopics. Effectivly, synonyms and subtopics are treated
+               // the same.
                if (subtopicAnalyzer != null) {
                   query.getTermsAndSubtopics().put(term, Sets.newHashSet(Terms.collect(term, subtopicAnalyzer)));
                }
             }
          }
-
-         // evaluate boostterms only if explicit sort is not given
-         if (!explicitSortEnabled) {
-
-            // extract separate boost fields and their boosts
-            if (boostUpTermEnabled || boostDownTermEnabled) {
-               Map<String, Float> boostFieldsAndBoosts = SolrPluginUtils.parseFieldBoosts(getReq().getParams()
-                     .getParams(
-                           PARAM_BOOST_UP_TERM_QF));
-               if (boostFieldsAndBoosts.isEmpty()) {
-                  query.getBoostFieldsAndBoosts().putAll(query.getFieldsAndBoosts());
-               } else {
-                  query.getBoostFieldsAndBoosts().putAll(boostFieldsAndBoosts);
-               }
-            }
-
-            // boost up and down terms
-            if (boostUpTermEnabled) {
-               if (boostUpAnalyzer != null) {
-                  String boostInput = getString();
-
-                  if (boostUpTermWithSynonyms) {
-                     boostInput += " " + Joiner.on(' ').join(Iterables.concat(query.getTermsAndSynonyms().values()));
-                  }
-
-                  query.getBoostUpTerms().addAll(Sets.newHashSet(Terms.collect(boostInput, boostUpAnalyzer)));
-               }
-
-               String boostUpTermExtra = getReq().getParams().get(PARAM_BOOST_UP_TERM_EXTRA);
-               if (boostUpTermExtra != null) {
-                  query.getBoostUpTerms().addAll(
-                        Sets.newHashSet(Splitter.on(',').omitEmptyStrings().split(boostUpTermExtra)));
-               }
-            }
-            req.getContext().put("boostUpTerms", query.getBoostUpTerms());
-         }
-
-         req.getContext().put("queryTerms", query.getTermsAndSynonyms().keySet());
-         req.getContext().put("synonyms", Sets.newHashSet(Iterables.concat(query.getTermsAndSynonyms().values())));
-         req.getContext().put("subtopics", Sets.newHashSet(Iterables.concat(query.getTermsAndSubtopics().values())));
 
          // done
          return query;

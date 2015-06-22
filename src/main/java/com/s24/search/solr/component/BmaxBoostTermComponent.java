@@ -14,9 +14,9 @@ import org.apache.solr.common.params.DisMaxParams;
 import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.params.SolrParams;
 import org.apache.solr.common.util.NamedList;
-import org.apache.solr.common.util.SimpleOrderedMap;
 import org.apache.solr.handler.component.ResponseBuilder;
 import org.apache.solr.handler.component.SearchComponent;
+import org.apache.solr.request.SolrQueryRequest;
 import org.apache.solr.search.ReRankQParserPlugin;
 import org.apache.solr.util.SolrPluginUtils;
 
@@ -37,6 +37,15 @@ import com.s24.search.solr.util.BmaxDebugInfo;
 public class BmaxBoostTermComponent extends SearchComponent {
 
    public static final String COMPONENT_NAME = "bmax.booster";
+
+   // params
+   public static final String PENALIZE_EXTRA_TERMS = COMPONENT_NAME + ".penalize.extra";
+   public static final String PENALIZE_DOC_COUNT = COMPONENT_NAME + ".penalize.docs";
+   private static final String PENALIZE_FACTOR = COMPONENT_NAME + ".penalize.factor";
+   public static final String PENALIZE_ENABLE = COMPONENT_NAME + ".penalize";
+   public static final String BOOST_EXTRA_TERMS = COMPONENT_NAME + ".boost.extra";
+   public static final String BOOST_ENABLE = COMPONENT_NAME + ".boost";
+   public static final String BOOST_FACTOR = COMPONENT_NAME + ".boost.factor";
 
    // produces boost terms
    private String boostTermFieldType;
@@ -62,12 +71,6 @@ public class BmaxBoostTermComponent extends SearchComponent {
          String q = rb.req.getParams().get(CommonParams.Q);
 
          if (q != null && !"*:*".equals(q)) {
-
-            // debug map exists?
-            if (rb.getDebugInfo() == null) {
-               rb.setDebugInfo(new SimpleOrderedMap<Object>());
-            }
-
             prepareInternal(rb);
          }
       }
@@ -76,14 +79,17 @@ public class BmaxBoostTermComponent extends SearchComponent {
    protected void prepareInternal(ResponseBuilder rb) throws IOException {
       checkNotNull(rb, "Pre-condition violated: rb must not be null.");
 
-      // collect preconditions
+      // collect configuration
       String q = rb.req.getParams().get(CommonParams.Q);
-      boolean boost = rb.req.getParams().getBool(COMPONENT_NAME + ".boost", true);
-      String boostExtraTerms = rb.req.getParams().get(COMPONENT_NAME + ".boost.extra");
-      boolean penalize = rb.req.getParams().getBool(COMPONENT_NAME + ".penalize", true);
-      float penalizeFactor = -Math.abs(rb.req.getParams().getFloat(COMPONENT_NAME + ".penalize.factor", 100.0f));
-      int penalizeDocs = rb.req.getParams().getInt(COMPONENT_NAME + ".penalize.docs", 400);
-      String penalizeExtraTerms = rb.req.getParams().get(COMPONENT_NAME + ".penalize.extra");
+      boolean boost = rb.req.getParams().getBool(BOOST_ENABLE, true);
+      String boostExtraTerms = rb.req.getParams().get(BOOST_EXTRA_TERMS);
+      float boostFactor = Math.abs(rb.req.getParams().getFloat(BOOST_FACTOR, 1f));
+      boolean penalize = rb.req.getParams().getBool(PENALIZE_ENABLE, true);
+      float penalizeFactor = -Math.abs(rb.req.getParams().getFloat(PENALIZE_FACTOR, 100.0f));
+      int penalizeDocs = rb.req.getParams().getInt(PENALIZE_DOC_COUNT, 400);
+      String penalizeExtraTerms = rb.req.getParams().get(PENALIZE_EXTRA_TERMS);
+
+      // collect analyzers
       Analyzer boostAnalyzer = rb.req.getSearcher().getSchema()
             .getFieldTypeByName(boostTermFieldType).getQueryAnalyzer();
       Analyzer penalizeAnalyzer = rb.req.getSearcher().getSchema()
@@ -101,8 +107,8 @@ public class BmaxBoostTermComponent extends SearchComponent {
 
          // add boosts
          if (!terms.isEmpty()) {
-            params.add("bq", String.format(Locale.US, "{!dismax qf='%s' mm=1} %s",
-                  rb.req.getParams().get(DisMaxParams.QF),
+            params.add("bq", String.format(Locale.US, "{!dismax qf='%s' mm=1 bq=''} %s",
+                  computeFactorizedQueryFields(rb.req, boostFactor),
                   Joiner.on(' ').join(terms)));
 
             // add debug
@@ -151,6 +157,34 @@ public class BmaxBoostTermComponent extends SearchComponent {
       }
 
       rb.req.setParams(params);
+   }
+
+   /**
+    * Computes
+    */
+   protected String computeFactorizedQueryFields(SolrQueryRequest request, float factor) {
+      checkNotNull(request, "Pre-condition violated: request must not be null.");
+
+      StringBuilder qf = new StringBuilder();
+
+      // parse fields and boosts
+      Map<String, Float> fieldBoosts = SolrPluginUtils.parseFieldBoosts(request.getParams().getParams(DisMaxParams.QF));
+
+      // iterate, add factor and add to result qf
+      for (Entry<String, Float> f : fieldBoosts.entrySet()) {
+         qf.append(f.getKey());
+         qf.append('^');
+
+         if (f.getValue() != null) {
+            qf.append(f.getValue() * factor);
+         } else {
+            qf.append(factor);
+         }
+
+         qf.append(' ');
+      }
+
+      return qf.toString();
    }
 
    @Override

@@ -2,7 +2,6 @@ package com.s24.search.solr.query.bmax;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
-import java.io.IOException;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map.Entry;
@@ -10,7 +9,6 @@ import java.util.Set;
 
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.index.Term;
-import org.apache.lucene.index.TermContext;
 import org.apache.lucene.queries.function.BoostedQuery;
 import org.apache.lucene.queries.function.ValueSource;
 import org.apache.lucene.queries.function.valuesource.ProductFloatFunction;
@@ -22,27 +20,24 @@ import org.apache.lucene.search.MatchAllDocsQuery;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.search.TermQuery;
 import org.apache.solr.schema.IndexSchema;
-import org.apache.solr.search.SolrIndexSearcher;
 
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 
 /**
- * 
+ * Builds the bmax dismax query
  * 
  * @author Shopping24 GmbH, Torsten Bøgh Köster (@tboeghk)
  */
 public class BmaxLuceneQueryBuilder {
 
    private final static float USER_QUERY_FIELD_BOOST = 1.0f;
-   private final static float BOOST_QUERY_FIELD_BOOST = 1.0f;
    private final static int DOCUMENT_FREQUENCY_NO_MANIPULATION = -1;
 
    private final BmaxQuery bmaxquery;
    private List<ValueSource> multiplicativeBoost;
+   private List<Query> boostQueries;
    private IndexSchema schema;
-   private SolrIndexSearcher indexSearcher;
-   private int maxDocumentFrequencyInQuery = -1;
 
    public BmaxLuceneQueryBuilder(BmaxQuery bmaxQuery) {
       checkNotNull(bmaxQuery, "Pre-condition violated: bmaxQuery must not be null.");
@@ -50,18 +45,24 @@ public class BmaxLuceneQueryBuilder {
       this.bmaxquery = bmaxQuery;
    }
 
+   public BmaxLuceneQueryBuilder withBoostQueries(List<Query> boostQueries) {
+      checkNotNull(boostQueries, "Pre-condition violated: boostQueries must not be null.");
+      
+      this.boostQueries = boostQueries;
+      return this;
+   }
+
    public BmaxLuceneQueryBuilder withMultiplicativeBoost(List<ValueSource> multiplicativeBoost) {
+      checkNotNull(multiplicativeBoost, "Pre-condition violated: multiplicativeBoost must not be null.");
+      
       this.multiplicativeBoost = multiplicativeBoost;
       return this;
    }
 
    public BmaxLuceneQueryBuilder withSchema(IndexSchema schema) {
+      checkNotNull(schema, "Pre-condition violated: schema must not be null.");
+      
       this.schema = schema;
-      return this;
-   }
-
-   public BmaxLuceneQueryBuilder withIndexSearcher(SolrIndexSearcher indexSearcher) {
-      this.indexSearcher = indexSearcher;
       return this;
    }
 
@@ -73,6 +74,7 @@ public class BmaxLuceneQueryBuilder {
       // default
       Query main = inner;
 
+      // add boost params
       if (multiplicativeBoost != null) {
          if (multiplicativeBoost.size() > 1) {
             ValueSource prod = new ProductFloatFunction(
@@ -93,95 +95,35 @@ public class BmaxLuceneQueryBuilder {
    protected Query buildWrappingQuery() {
       if (bmaxquery.getTermsAndSynonyms().isEmpty()) {
          return new MatchAllDocsQuery();
-      } 
-         
+      }
+
       BooleanQuery bq = new BooleanQuery(true);
 
       // iterate terms
       for (Entry<CharSequence, Set<CharSequence>> termAndSynonyms : bmaxquery.getTermsAndSynonyms().entrySet()) {
 
          // create new entry to use in following functions
-         Entry<CharSequence, Set<CharSequence>> term = Maps.immutableEntry(termAndSynonyms.getKey(), (Set<CharSequence>) Sets.newHashSet(termAndSynonyms.getValue()));
-         
+         Entry<CharSequence, Set<CharSequence>> term = Maps.immutableEntry(termAndSynonyms.getKey(),
+               (Set<CharSequence>) Sets.newHashSet(termAndSynonyms.getValue()));
+
          // add subtopics
          if (bmaxquery.getTermsAndSubtopics().containsKey(termAndSynonyms.getKey())) {
             term.getValue().addAll(bmaxquery.getTermsAndSubtopics().get(termAndSynonyms.getKey()));
          }
-         
+
          // append dismax query as clause
          bq.add(new BooleanClause(buildDismaxQuery(term), Occur.MUST));
       }
 
-      // build boostings
-      if (!bmaxquery.getBoostUpTerms().isEmpty()) {
-         Collection<BooleanClause> clauses = buildBoostQueryClauses(bmaxquery.getBoostUpTerms());
-
-         for (BooleanClause bc : clauses) {
-            bq.add(bc);
+      // add boostings
+      if (boostQueries != null) {
+         for (Query f : boostQueries) {
+            bq.add(f, BooleanClause.Occur.SHOULD);
          }
       }
 
+      // done
       return bq;
-   }
-
-   // ---- boost query
-
-   /**
-    * Builds a boost query
-    */
-   protected Collection<BooleanClause> buildBoostQueryClauses(Collection<CharSequence> boostTerms) {
-      checkNotNull(boostTerms, "Pre-condition violated: boostTerms must not be null.");
-
-      Collection<BooleanClause> clauses = Sets.newHashSet();
-
-      // compute a single dismax clause for every term
-      for (CharSequence term : boostTerms) {
-         clauses.add(new BooleanClause(buildBoostQueryDismaxFieldClause(term, BOOST_QUERY_FIELD_BOOST), Occur.SHOULD));
-      }
-
-      return clauses;
-   }
-
-   /**
-    * Transforms the given input into valid field terms
-    */
-   protected Query buildBoostQueryDismaxFieldClause(CharSequence term, float extraBoost) {
-      checkNotNull(term, "Pre-condition violated: field must not be null.");
-
-      DisjunctionMaxQuery dmq = new DisjunctionMaxQuery(0);
-
-      // iterate fields to place term in
-      for (String field : bmaxquery.getBoostFieldsAndBoosts().keySet()) {
-
-         // get analyzer for field
-         Analyzer analyzer = schema.getField(field).getType().getQueryAnalyzer();
-
-         // transform terms into Term representation
-         Collection<Term> terms = Terms.collectTerms(term, analyzer, field);
-
-         // get max document frequency of terms
-         int documentFrequency = -1;
-         if (bmaxquery.isManipulateDocumentFrequencies()) {
-            documentFrequency = Terms.collectMaximumDocumentFrequency(terms, indexSearcher);
-         }
-
-         // norm term queries and make sure their document frequency is always
-         // below the main query's doc frequency.
-         Collection<Query> termQueries = buildTermQueries(field, terms, BOOST_QUERY_FIELD_BOOST,
-               (maxDocumentFrequencyInQuery + documentFrequency - 1));
-
-         // use dismax queries if terms has been split into pieces
-         if (termQueries.size() > 0) {
-            dmq.add(termQueries);
-         }
-      }
-
-      // return term query only
-      if (dmq.getDisjuncts().size() == 1) {
-         return dmq.iterator().next();
-      }
-
-      return dmq;
    }
 
    // ---- main query
@@ -197,7 +139,7 @@ public class BmaxLuceneQueryBuilder {
 
       // iterate fields and build concrete queries
       for (String field : bmaxquery.getFieldsAndBoosts().keySet()) {
-         
+
          // collect terms
          Analyzer analyzer = schema.getField(field).getType().getQueryAnalyzer();
          Set<Term> originalTerms = Sets.newHashSet(Terms.collectTerms(termWithSynonyms.getKey(), analyzer, field));
@@ -214,17 +156,8 @@ public class BmaxLuceneQueryBuilder {
          // add synonym clauses
          if (!synonyms.isEmpty()) {
 
-            // get max document frequency of main terms
-            int documentFrequency = -1;
-            if (bmaxquery.isManipulateDocumentFrequencies()) {
-               documentFrequency = Terms.collectMaximumDocumentFrequency(originalTerms, indexSearcher);
-
-               // update maximum in query
-               this.maxDocumentFrequencyInQuery = Math.max(documentFrequency, maxDocumentFrequencyInQuery);
-            }
-
             // add clauses
-            dmq.add(buildTermQueries(field, synonyms, bmaxquery.getSynonymBoost(), documentFrequency));
+            dmq.add(buildTermQueries(field, synonyms, bmaxquery.getSynonymBoost(), -1));
          }
       }
 
@@ -256,41 +189,7 @@ public class BmaxLuceneQueryBuilder {
    protected TermQuery buildTermQuery(Term term, float boost, int documentFrequency) {
       checkNotNull(term, "Pre-condition violated: term must not be null.");
 
-      TermQuery query = null;
-
-      if (bmaxquery.isManipulateTermFrequencies() && documentFrequency > 0) {
-         try {
-
-            // build term context
-            TermContext termContext = TermContext.build(indexSearcher.getTopReaderContext(), term);
-
-            // this is a fucked up hell
-            TermContext manipulated = new TermContext(indexSearcher.getTopReaderContext());
-            boolean foundTermInContext = false;
-
-            // iterate leaves and find first matching. Fake doc frequency and
-            // term freqency.
-            for (int ord = 0; ord < indexSearcher.getTopReaderContext().leaves().size(); ord++) {
-               if (termContext.get(ord) != null) {
-                  manipulated.register(termContext.get(ord), ord, documentFrequency, -1);
-                  foundTermInContext = true;
-               }
-            }
-
-            if (foundTermInContext) {
-               query = new TermQuery(term, manipulated);
-            } else {
-               query = new TermQuery(term, documentFrequency);
-            }
-         } catch (IOException e) {
-            throw new RuntimeException(e);
-         }
-      }
-
-      // fallback
-      if (query == null) {
-         query = new TermQuery(term);
-      }
+      TermQuery query = new TermQuery(term);
 
       // set boost
       if (boost > 0f) {

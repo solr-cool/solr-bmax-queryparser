@@ -16,6 +16,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.hash.Hasher;
 import com.google.common.hash.Hashing;
 import com.s24.search.solr.functions.FloatCachingValueSource;
+import com.s24.search.solr.util.BmaxDebugInfo;
 
 /**
  * Replaces given boost parameters with a single cached boost function.
@@ -57,7 +58,7 @@ public abstract class AbstractCachingComponent extends SearchComponent {
          SolrCache<String, ValueSource> cache = rb.req.getSearcher().getCache(componentName);
 
          // more than one boost given
-         if (cache != null && boosts != null && boosts.length > 1) {
+         if (cache != null && boosts != null && boosts.length > 0) {
             try {
                // replace all boosts with the new, cached boost function
                ModifiableSolrParams params = new ModifiableSolrParams(rb.req.getParams());
@@ -68,6 +69,11 @@ public abstract class AbstractCachingComponent extends SearchComponent {
             } catch (Exception e) {
                throw new IOException(e);
             }
+         }
+         
+         if (cache == null) {
+            BmaxDebugInfo.add(rb, componentName, String.format(Locale.US, 
+                  "No cache named '%s' configured.", componentName));
          }
       }
    }
@@ -97,10 +103,12 @@ public abstract class AbstractCachingComponent extends SearchComponent {
          // place compiled functions into cache if not already present
          if (cache.get(key) == null) {
             cache.put(key, wrapInCachingValueSource(function, rb.req.getSearcher().maxDoc()));
+            BmaxDebugInfo.add(rb, componentName, "Compiled new cached function for key " + key);
          }
 
          // replace boost functions with a cached one
          boosts = new String[] { String.format(Locale.US, "%s(%s,%s)", functionName, componentName, key) };
+         BmaxDebugInfo.add(rb, componentName, "Using compiled cache function " + boosts[0]);
       }
 
       return boosts;

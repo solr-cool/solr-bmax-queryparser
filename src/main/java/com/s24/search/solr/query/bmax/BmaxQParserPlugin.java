@@ -16,24 +16,15 @@ import org.apache.solr.search.QParserPlugin;
  */
 public class BmaxQParserPlugin extends QParserPlugin {
    /**
-    * Field type with query analyzer for boost terms.
-    */
-   private String boostUpFieldType;
-   private Analyzer boostUpAnalyzer;
-
-   /**
     * Field type with query analyzer for penalize terms.
     */
-   private String boostDownFieldType;
-   private Analyzer boostDownAnalyzer;
-
-   private String synonymFieldType;
-   private Analyzer synonymAnalyzer;
-
-   private String subtopicFieldType;
-   private Analyzer subtopicAnalyzer;
-
    private String queryParsingFieldType;
+   private String synonymFieldType;
+   private String subtopicFieldType;
+
+   // pre-loaded analyzers to use
+   private Analyzer synonymAnalyzer;
+   private Analyzer subtopicAnalyzer;
    private Analyzer queryParsingAnalyzer;
 
    @Override
@@ -44,8 +35,6 @@ public class BmaxQParserPlugin extends QParserPlugin {
       queryParsingFieldType = checkNotNull((String) args.get("queryParsingFieldType"), "No queryParsingFieldType given. Aborting.");
 
       // optional
-      boostUpFieldType = (String) args.get("boostUpFieldType");
-      boostDownFieldType = (String) args.get("boostDownFieldType");
       synonymFieldType = (String) args.get("synonymFieldType");
       subtopicFieldType = (String) args.get("subtopicFieldType");
    }
@@ -56,10 +45,6 @@ public class BmaxQParserPlugin extends QParserPlugin {
 
       // get query parsers if not available
       if (queryParsingAnalyzer == null) {
-         this.boostUpAnalyzer = (boostUpFieldType != null) ? req.getSchema().getFieldTypeByName(boostUpFieldType)
-               .getQueryAnalyzer() : null;
-         this.boostDownAnalyzer = (boostDownFieldType != null) ? req.getSchema().getFieldTypeByName(boostDownFieldType)
-               .getQueryAnalyzer() : null;
          this.queryParsingAnalyzer = (queryParsingFieldType != null) ? req.getSchema()
                .getFieldTypeByName(queryParsingFieldType)
                .getQueryAnalyzer() : null;
@@ -78,7 +63,6 @@ public class BmaxQParserPlugin extends QParserPlugin {
       } 
       
       return new BmaxQueryParser(qstr, localParams, req.getParams(), req, queryParsingAnalyzer, 
-            synonymAnalyzer, subtopicAnalyzer,
-            boostUpAnalyzer, boostDownAnalyzer);
+            synonymAnalyzer, subtopicAnalyzer);
    }
 }
