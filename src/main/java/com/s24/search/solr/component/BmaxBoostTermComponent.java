@@ -24,6 +24,7 @@ import com.google.common.base.Joiner;
 import com.google.common.base.Splitter;
 import com.google.common.collect.Sets;
 import com.s24.search.solr.query.bmax.Terms;
+import com.s24.search.solr.util.BmaxDebugInfo;
 
 /**
  * Adds boost and penalize terms to a query. Boost terms are filled into a
@@ -61,23 +62,17 @@ public class BmaxBoostTermComponent extends SearchComponent {
          String q = rb.req.getParams().get(CommonParams.Q);
 
          if (q != null && !"*:*".equals(q)) {
-            
+
             // debug map exists?
             if (rb.getDebugInfo() == null) {
                rb.setDebugInfo(new SimpleOrderedMap<Object>());
             }
-            
-            // bmax debug map exists?
-            if (rb.getDebugInfo().get("bmax") == null) {
-               rb.getDebugInfo().add("bmax", new SimpleOrderedMap<String>());
-            }
-            
+
             prepareInternal(rb);
          }
       }
    }
 
-   @SuppressWarnings("unchecked")
    protected void prepareInternal(ResponseBuilder rb) throws IOException {
       checkNotNull(rb, "Pre-condition violated: rb must not be null.");
 
@@ -109,9 +104,9 @@ public class BmaxBoostTermComponent extends SearchComponent {
             params.add("bq", String.format(Locale.US, "{!dismax qf='%s' mm=1} %s",
                   rb.req.getParams().get(DisMaxParams.QF),
                   Joiner.on(' ').join(terms)));
-            
+
             // add debug
-            ((NamedList<String>) rb.getDebugInfo().get("bmax")).add("boost.terms", Joiner.on(' ').join(terms));
+            BmaxDebugInfo.add(rb, "boost.terms", Joiner.on(' ').join(terms));
          }
       }
 
@@ -146,12 +141,12 @@ public class BmaxBoostTermComponent extends SearchComponent {
                rerank.append(joinedTerms);
                rerank.append(')');
             }
-            
+
             // append rerank query
             params.add("rqq", rerank.toString());
-            
+
             // add debug
-            ((NamedList<String>) rb.getDebugInfo().get("bmax")).add("penalize.terms", joinedTerms);
+            BmaxDebugInfo.add(rb, "penalize.terms", Joiner.on(' ').join(terms));
          }
       }
 
