@@ -1,5 +1,6 @@
 package com.s24.search.solr.functions;
 
+import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 
 import java.io.IOException;
@@ -12,6 +13,8 @@ import org.apache.lucene.queries.function.docvalues.FloatDocValues;
 import org.apache.lucene.util.packed.PackedInts;
 
 import com.google.common.base.Objects;
+import com.s24.search.solr.util.FloatArrayValueCache;
+import com.s24.search.solr.util.FloatValueCache;
 import com.s24.search.solr.util.packed.OffsetGrowableFloatWriter;
 
 /**
@@ -20,8 +23,12 @@ import com.s24.search.solr.util.packed.OffsetGrowableFloatWriter;
  */
 public class FloatCachingValueSource extends ValueSource {
 
+   public static final int CACHE_FAST = 0;
+   public static final int CACHE_EFFICIENT = 1;
+   public static final int CACHE_MAX_EFFICIENT = 2;
+
    private final ValueSource source;
-   private final OffsetGrowableFloatWriter cache;
+   private final FloatValueCache cache;
 
    /**
     * Creates a caching value source for the given underlying value source.
@@ -31,12 +38,25 @@ public class FloatCachingValueSource extends ValueSource {
     * @param maxDoc
     *           the maxDoc of the index.
     */
-   public FloatCachingValueSource(ValueSource source, int maxDoc) {
+   public FloatCachingValueSource(ValueSource source, int maxDoc, int cacheHint) {
       this.source = checkNotNull(source);
-      this.cache = new OffsetGrowableFloatWriter(
-            OffsetGrowableFloatWriter.DEFAULT_PRECISION,
-            4, maxDoc,
-            PackedInts.DEFAULT);
+      checkArgument(maxDoc > 0, "Pre-condition violated: expression cacheHint >= 0 must be true.");
+      checkArgument(cacheHint >= 0, "Pre-condition violated: expression cacheHint >= 0 must be true.");
+      checkArgument(cacheHint <= 2, "Pre-condition violated: expression cacheHint <= 2 must be true.");
+
+      if (CACHE_FAST == cacheHint) {
+         // dead simple impl
+         this.cache = new FloatArrayValueCache(maxDoc);
+      } else if (CACHE_EFFICIENT == cacheHint) {
+         // mem efficient
+         this.cache = new OffsetGrowableFloatWriter(
+               OffsetGrowableFloatWriter.DEFAULT_PRECISION,
+               4, maxDoc,
+               PackedInts.DEFAULT);
+      } else {
+         // TODO max memory efficient, but not suitable for larger datasets
+         this.cache = null;
+      }
    }
 
    /**

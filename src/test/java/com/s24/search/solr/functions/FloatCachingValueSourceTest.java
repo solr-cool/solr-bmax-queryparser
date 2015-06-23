@@ -33,7 +33,7 @@ public class FloatCachingValueSourceTest {
    public void setUp() throws Exception {
       MockitoAnnotations.initMocks(this);
       when(mockSource.getValues(any(Map.class), any(AtomicReaderContext.class))).thenReturn(mockValues);
-      valueSource = new FloatCachingValueSource(mockSource, MAX_DOC);
+      valueSource = new FloatCachingValueSource(mockSource, MAX_DOC, FloatCachingValueSource.CACHE_FAST);
    }
 
    @Test
@@ -49,8 +49,8 @@ public class FloatCachingValueSourceTest {
       assertFalse(valueSource.equals(null));
       assertFalse(valueSource.equals(new Object()));
       assertTrue(valueSource.equals(valueSource));
-      assertTrue(valueSource.equals(new FloatCachingValueSource(mockSource, MAX_DOC)));
-      assertEquals(valueSource.hashCode(), new FloatCachingValueSource(mockSource, MAX_DOC).hashCode());
+      assertTrue(valueSource.equals(new FloatCachingValueSource(mockSource, MAX_DOC, FloatCachingValueSource.CACHE_FAST)));
+      assertEquals(valueSource.hashCode(), new FloatCachingValueSource(mockSource, MAX_DOC, FloatCachingValueSource.CACHE_FAST).hashCode());
    }
 
    @Test

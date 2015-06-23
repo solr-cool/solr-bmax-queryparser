@@ -2,12 +2,14 @@ package com.s24.search.solr.util.packed;
 
 import static com.google.common.base.Preconditions.checkArgument;
 
+import com.s24.search.solr.util.FloatValueCache;
+
 /**
  * A growable writer that stores floats.
  * 
  * @author Shopping24 GmbH, Torsten Bøgh Köster (@tboeghk)
  */
-public class OffsetGrowableFloatWriter extends OffsetGrowableWriter {
+public class OffsetGrowableFloatWriter extends OffsetGrowableWriter implements FloatValueCache {
 
    public static final int DEFAULT_PRECISION = 10000;
 

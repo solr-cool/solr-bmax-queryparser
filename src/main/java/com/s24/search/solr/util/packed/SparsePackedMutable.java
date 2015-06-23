@@ -2,21 +2,19 @@ package com.s24.search.solr.util.packed;
 
 import static com.google.common.base.Preconditions.checkArgument;
 
-import java.util.BitSet;
-
-import org.apache.lucene.search.DocIdSetIterator;
-import org.apache.lucene.util.DocIdBitSet;
+import org.apache.lucene.util.OpenBitSet;
 import org.apache.lucene.util.packed.PackedInts;
 
 public class SparsePackedMutable extends PackedInts.Mutable {
 
    private final int DEFAULT_BUFFER_SIZE = PackedInts.DEFAULT_BUFFER_SIZE * 1024; // 1M
-   
+
    private final long defaultValue;
    private final int intialSize;
    private final float acceptableOverheadRatio;
    private OffsetGrowableWriter internalWriter;
-   private DocIdBitSet docs;
+   private OpenBitSet docs;
+   private int maxDocId = -1;
 
    public SparsePackedMutable(long defaultValue, int maxValueCount, int intialSize, float acceptableOverheadRatio) {
       this.defaultValue = defaultValue;
@@ -25,7 +23,7 @@ public class SparsePackedMutable extends PackedInts.Mutable {
 
       // create internal helpers
       this.internalWriter = new OffsetGrowableWriter(4, intialSize, acceptableOverheadRatio);
-      this.docs = new DocIdBitSet(new BitSet(maxValueCount));
+      this.docs = new OpenBitSet(maxValueCount);
    }
 
    @Override
@@ -36,36 +34,41 @@ public class SparsePackedMutable extends PackedInts.Mutable {
 
             // get index of doc and replace value
             internalWriter.set(internalIndexOf(doc), value);
-         } else if (docs.getBitSet().cardinality() == 0) {
+         } else if (docs.cardinality() == 0) {
             internalWriter.set(0, value);
-            docs.getBitSet().set(doc);
+            docs.set(doc);
+            maxDocId = doc;
          } else {
             // expand existing writer as default
             OffsetGrowableWriter next = internalWriter;
+            int internalWriterSize = internalWriter.size();
 
             // grow internal representation if needed
-            if (docs.getBitSet().cardinality() == internalWriter.size()) {
+            if (docs.cardinality() == internalWriterSize) {
                next = new OffsetGrowableWriter(
                      internalWriter.getBitsPerValue(),
-                     internalWriter.size() + intialSize,
+                     internalWriterSize + intialSize,
                      acceptableOverheadRatio,
                      internalWriter.getCurrentMinimumValue());
 
                // copy existing values
-               PackedInts.copy(internalWriter.getMutable(), 0, next.getMutable(), 0, internalWriter.size(),
+               PackedInts.copy(internalWriter.getMutable(), 0, next.getMutable(), 0, internalWriterSize,
                      DEFAULT_BUFFER_SIZE);
+
+               // update current size
+               internalWriterSize += intialSize;
             }
 
             // append
-            if (docs.iterator().advance(doc) == DocIdSetIterator.NO_MORE_DOCS) {
+            if (doc > maxDocId) {
                // append given one
-               next.set(docs.getBitSet().cardinality(), value);
+               next.set(++maxDocId, value);
             } else {
 
                // insert: move trailing values towards the end
                int index = internalIndexOf(doc);
                PackedInts.copy(next.getMutable(), index,
-                     next.getMutable(), index + 1, next.size() - index - 1,
+                     next.getMutable(), index + 1, internalWriterSize - index - 1,
                      DEFAULT_BUFFER_SIZE);
 
                // insert new value
@@ -73,7 +76,7 @@ public class SparsePackedMutable extends PackedInts.Mutable {
             }
 
             // mark doc
-            docs.getBitSet().set(doc);
+            docs.set(doc);
 
             // replace internal representation
             this.internalWriter = next;
@@ -91,7 +94,7 @@ public class SparsePackedMutable extends PackedInts.Mutable {
 
       // this is the long representation. For a -1, advance 64 indexes / docs,
       // for a 0, advance 64 documents
-      long[] internals = docs.getBitSet().toLongArray();
+      long[] internals = docs.getBits();
       final int bitsPerLong = Long.bitCount(-1);
 
       // advance docs/index until either eo docs or eo words

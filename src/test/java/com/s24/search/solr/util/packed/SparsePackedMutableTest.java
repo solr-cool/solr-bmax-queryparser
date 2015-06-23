@@ -39,7 +39,7 @@ public class SparsePackedMutableTest {
 
    @Test
    public void testRandomWriteGet() throws Exception {
-      SparsePackedMutable sparse = new SparsePackedMutable(0l, 8, PackedInts.bitsRequired(1024), PackedInts.DEFAULT);
+      SparsePackedMutable sparse = new SparsePackedMutable(0l, 16, PackedInts.bitsRequired(1024), PackedInts.DEFAULT);
       sparse.set(0, 39);
       sparse.set(4, 44);
       sparse.set(5, 45);
@@ -137,8 +137,8 @@ public class SparsePackedMutableTest {
 
          assertEquals("doc: " + i, value, sparseValue.longValue());
 
-         if (i % (1024 * 128) == 0) {
-            System.out.println(String.format("%s --> sr: %s, gr: %s", i,
+         if (i % (1024 * 16) == 0) {
+            System.out.println(String.format("%s --> setter: %sms, getter: %sms", i,
                   NumberFormat.getNumberInstance().format(setter.getMean()), NumberFormat.getNumberInstance()
                         .format(getter.getMean())));
          }

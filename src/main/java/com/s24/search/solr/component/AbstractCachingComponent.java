@@ -130,7 +130,7 @@ public abstract class AbstractCachingComponent extends SearchComponent {
     * this uses a {@linkplain FloatCachingValueSource}.
     */
    protected ValueSource wrapInCachingValueSource(ValueSource function, int maxDocs) {
-      return new FloatCachingValueSource(function, maxDocs);
+      return new FloatCachingValueSource(function, maxDocs, FloatCachingValueSource.CACHE_EFFICIENT);
    }
 
    /**

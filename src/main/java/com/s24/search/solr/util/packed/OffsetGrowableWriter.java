@@ -1,10 +1,9 @@
 package com.s24.search.solr.util.packed;
 
 import java.io.IOException;
-import java.util.BitSet;
 
 import org.apache.lucene.search.DocIdSetIterator;
-import org.apache.lucene.util.DocIdBitSet;
+import org.apache.lucene.util.OpenBitSet;
 import org.apache.lucene.util.packed.GrowableWriter;
 
 /**
@@ -17,7 +16,7 @@ import org.apache.lucene.util.packed.GrowableWriter;
 public class OffsetGrowableWriter extends GrowableWriter {
 
    // track ids that have been modified
-   private final DocIdBitSet valuesFilled;
+   private final OpenBitSet valuesFilled;
 
    // initial minimum value
    private long minimumValue = Long.MAX_VALUE;
@@ -30,7 +29,7 @@ public class OffsetGrowableWriter extends GrowableWriter {
       super(startBitsPerValue, valueCount, acceptableOverheadRatio);
 
       this.minimumValue = minimalValue;
-      this.valuesFilled = new DocIdBitSet(new BitSet(valueCount));
+      this.valuesFilled = new OpenBitSet(valueCount);
 
       // reset contents
       fill(0, valueCount, 0l);
@@ -86,7 +85,7 @@ public class OffsetGrowableWriter extends GrowableWriter {
       super.set(index, diff);
 
       // mark set
-      valuesFilled.getBitSet().set(index);
+      valuesFilled.set(index);
    }
 
    /**
