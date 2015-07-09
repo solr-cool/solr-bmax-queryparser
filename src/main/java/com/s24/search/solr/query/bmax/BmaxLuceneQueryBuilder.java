@@ -4,8 +4,6 @@ import static com.google.common.base.Preconditions.checkNotNull;
 
 import java.util.Collection;
 import java.util.List;
-import java.util.Map.Entry;
-import java.util.Set;
 
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.index.Term;
@@ -21,8 +19,8 @@ import org.apache.lucene.search.Query;
 import org.apache.lucene.search.TermQuery;
 import org.apache.solr.schema.IndexSchema;
 
-import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
+import com.s24.search.solr.query.bmax.BmaxQuery.BmaxTerm;
 
 /**
  * Builds the bmax dismax query
@@ -32,7 +30,6 @@ import com.google.common.collect.Sets;
 public class BmaxLuceneQueryBuilder {
 
    private final static float USER_QUERY_FIELD_BOOST = 1.0f;
-   private final static int DOCUMENT_FREQUENCY_NO_MANIPULATION = -1;
 
    private final BmaxQuery bmaxquery;
    private List<ValueSource> multiplicativeBoost;
@@ -47,21 +44,21 @@ public class BmaxLuceneQueryBuilder {
 
    public BmaxLuceneQueryBuilder withBoostQueries(List<Query> boostQueries) {
       checkNotNull(boostQueries, "Pre-condition violated: boostQueries must not be null.");
-      
+
       this.boostQueries = boostQueries;
       return this;
    }
 
    public BmaxLuceneQueryBuilder withMultiplicativeBoost(List<ValueSource> multiplicativeBoost) {
       checkNotNull(multiplicativeBoost, "Pre-condition violated: multiplicativeBoost must not be null.");
-      
+
       this.multiplicativeBoost = multiplicativeBoost;
       return this;
    }
 
    public BmaxLuceneQueryBuilder withSchema(IndexSchema schema) {
       checkNotNull(schema, "Pre-condition violated: schema must not be null.");
-      
+
       this.schema = schema;
       return this;
    }
@@ -93,23 +90,14 @@ public class BmaxLuceneQueryBuilder {
     * Builds the wrapping, unboosted query.
     */
    protected Query buildWrappingQuery() {
-      if (bmaxquery.getTermsAndSynonyms().isEmpty()) {
+      if (bmaxquery.getTerms().isEmpty()) {
          return new MatchAllDocsQuery();
       }
 
       BooleanQuery bq = new BooleanQuery(true);
 
       // iterate terms
-      for (Entry<CharSequence, Set<CharSequence>> termAndSynonyms : bmaxquery.getTermsAndSynonyms().entrySet()) {
-
-         // create new entry to use in following functions
-         Entry<CharSequence, Set<CharSequence>> term = Maps.immutableEntry(termAndSynonyms.getKey(),
-               (Set<CharSequence>) Sets.newHashSet(termAndSynonyms.getValue()));
-
-         // add subtopics
-         if (bmaxquery.getTermsAndSubtopics().containsKey(termAndSynonyms.getKey())) {
-            term.getValue().addAll(bmaxquery.getTermsAndSubtopics().get(termAndSynonyms.getKey()));
-         }
+      for (BmaxTerm term : bmaxquery.getTerms()) {
 
          // append dismax query as clause
          bq.add(new BooleanClause(buildDismaxQuery(term), Occur.MUST));
@@ -132,32 +120,41 @@ public class BmaxLuceneQueryBuilder {
     * Builds a dismax query for the given terms and their corresponding
     * synonyms.
     */
-   protected Query buildDismaxQuery(Entry<CharSequence, Set<CharSequence>> termWithSynonyms) {
-      checkNotNull(termWithSynonyms, "Pre-condition violated: termWithSynonyms must not be null.");
+   protected Query buildDismaxQuery(BmaxTerm term) {
+      checkNotNull(term, "Pre-condition violated: term must not be null.");
 
-      DisjunctionMaxQuery dmq = new DisjunctionMaxQuery(0);
+      DisjunctionMaxQuery dmq = new DisjunctionMaxQuery(bmaxquery.getTieBreakerMultiplier());
 
       // iterate fields and build concrete queries
       for (String field : bmaxquery.getFieldsAndBoosts().keySet()) {
 
-         // collect terms
+         // get analyzer to work with
          Analyzer analyzer = schema.getField(field).getType().getQueryAnalyzer();
-         Set<Term> originalTerms = Sets.newHashSet(Terms.collectTerms(termWithSynonyms.getKey(), analyzer, field));
 
-         // add main user clause
-         dmq.add(buildTermQueries(field, originalTerms, USER_QUERY_FIELD_BOOST, DOCUMENT_FREQUENCY_NO_MANIPULATION));
+         // add main term clause
+         dmq.add(
+               buildTermQueries(field,
+                     Terms.collectTerms(term.getTerm(), analyzer, field),
+                     USER_QUERY_FIELD_BOOST));
 
-         // collect terms
-         Set<Term> synonyms = Sets.newHashSet();
-         for (CharSequence t : termWithSynonyms.getValue()) {
-            synonyms.addAll(Terms.collectTerms(t, analyzer, field));
+         // add synonym clause
+         if (!term.getSynonyms().isEmpty()) {
+            for (CharSequence synonym : term.getSynonyms()) {
+               dmq.add(
+                     buildTermQueries(field,
+                           Terms.collectTerms(synonym, analyzer, field),
+                           bmaxquery.getSynonymBoost()));
+            }
          }
 
-         // add synonym clauses
-         if (!synonyms.isEmpty()) {
-
-            // add clauses
-            dmq.add(buildTermQueries(field, synonyms, bmaxquery.getSynonymBoost(), -1));
+         // add subtopic clause
+         if (!term.getSubtopics().isEmpty()) {
+            for (CharSequence subtopic : term.getSubtopics()) {
+               dmq.add(
+                     buildTermQueries(field,
+                           Terms.collectTerms(subtopic, analyzer, field),
+                           bmaxquery.getSubtopicBoost()));
+            }
          }
       }
 
@@ -169,15 +166,14 @@ public class BmaxLuceneQueryBuilder {
    /**
     * Combines the given terms to a valid dismax query for the field given.
     */
-   protected Collection<Query> buildTermQueries(String field, Collection<Term> terms, float extraBoost,
-         int documentFrequency) {
+   protected Collection<Query> buildTermQueries(String field, Collection<Term> terms, float extraBoost) {
       checkNotNull(field, "Pre-condition violated: field must not be null.");
       checkNotNull(terms, "Pre-condition violated: terms must not be null.");
 
       Collection<Query> queries = Sets.newHashSet();
 
       for (Term term : terms) {
-         queries.add(buildTermQuery(term, bmaxquery.getFieldsAndBoosts().get(field) * extraBoost, documentFrequency));
+         queries.add(buildTermQuery(term, bmaxquery.getFieldsAndBoosts().get(field) * extraBoost));
       }
 
       return queries;
@@ -186,7 +182,7 @@ public class BmaxLuceneQueryBuilder {
    /**
     * Builds a term query and manipulates the document frequency, if given.
     */
-   protected TermQuery buildTermQuery(Term term, float boost, int documentFrequency) {
+   protected TermQuery buildTermQuery(Term term, float boost) {
       checkNotNull(term, "Pre-condition violated: term must not be null.");
 
       TermQuery query = new TermQuery(term);

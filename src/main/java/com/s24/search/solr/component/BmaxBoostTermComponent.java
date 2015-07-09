@@ -46,6 +46,10 @@ public class BmaxBoostTermComponent extends SearchComponent {
    public static final String BOOST_EXTRA_TERMS = COMPONENT_NAME + ".boost.extra";
    public static final String BOOST_ENABLE = COMPONENT_NAME + ".boost";
    public static final String BOOST_FACTOR = COMPONENT_NAME + ".boost.factor";
+   public static final String SYNONYM_ENABLE = COMPONENT_NAME + ".synonyms";
+
+   // (optional) synonym field
+   private String synonymFieldType;
 
    // produces boost terms
    private String boostTermFieldType;
@@ -58,6 +62,7 @@ public class BmaxBoostTermComponent extends SearchComponent {
       super.init(args);
 
       SolrParams configuration = SolrParams.toSolrParams(args);
+      synonymFieldType = configuration.get("synonymFieldType");
       boostTermFieldType = configuration.get("boostTermFieldType");
       penalizeTermFieldType = configuration.get("penalizeTermFieldType");
    }
@@ -88,14 +93,22 @@ public class BmaxBoostTermComponent extends SearchComponent {
       float penalizeFactor = -Math.abs(rb.req.getParams().getFloat(PENALIZE_FACTOR, 100.0f));
       int penalizeDocs = rb.req.getParams().getInt(PENALIZE_DOC_COUNT, 400);
       String penalizeExtraTerms = rb.req.getParams().get(PENALIZE_EXTRA_TERMS);
+      boolean synonyms = rb.req.getParams().getBool(SYNONYM_ENABLE, true);
 
       // collect analyzers
+      Analyzer synonymAnalyzer = rb.req.getSearcher().getSchema()
+            .getFieldTypeByName(synonymFieldType).getQueryAnalyzer();
       Analyzer boostAnalyzer = rb.req.getSearcher().getSchema()
             .getFieldTypeByName(boostTermFieldType).getQueryAnalyzer();
       Analyzer penalizeAnalyzer = rb.req.getSearcher().getSchema()
             .getFieldTypeByName(penalizeTermFieldType).getQueryAnalyzer();
       ModifiableSolrParams params = new ModifiableSolrParams(rb.req.getParams());
 
+      // collect synonyms
+      if (synonyms) {
+         q += " " + Joiner.on(' ').skipNulls().join(Terms.collect(q, synonymAnalyzer));
+      }
+      
       // check boosts
       if (boost) {
          Collection<CharSequence> terms = Terms.collect(q, boostAnalyzer);
@@ -112,7 +125,7 @@ public class BmaxBoostTermComponent extends SearchComponent {
                   Joiner.on(' ').join(terms)));
 
             // add debug
-            BmaxDebugInfo.add(rb, "boost.terms", Joiner.on(' ').join(terms));
+            BmaxDebugInfo.add(rb, COMPONENT_NAME + ".boost.terms", Joiner.on(' ').join(terms));
          }
       }
 
@@ -152,7 +165,7 @@ public class BmaxBoostTermComponent extends SearchComponent {
             params.add("rqq", rerank.toString());
 
             // add debug
-            BmaxDebugInfo.add(rb, "penalize.terms", Joiner.on(' ').join(terms));
+            BmaxDebugInfo.add(rb, COMPONENT_NAME + ".penalize.terms", Joiner.on(' ').join(terms));
          }
       }
 
