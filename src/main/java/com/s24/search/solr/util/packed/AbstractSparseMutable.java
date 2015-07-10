@@ -7,28 +7,29 @@ import org.apache.lucene.util.OpenBitSet;
 import org.apache.lucene.util.RamUsageEstimator;
 import org.apache.lucene.util.packed.PackedInts;
 
+import com.s24.search.solr.util.LongValueCache;
+
 /**
+ * A sparse packed data structure
  * 
  * @author Shopping24 GmbH, Torsten Bøgh Köster (@tboeghk)
  */
-public class SparsePackedMutable2 extends PackedInts.Mutable {
+public abstract class AbstractSparseMutable extends PackedInts.Mutable {
 
    // holds the per-bucket bits
    private final long[] words;
 
    // each word bucket is associated with a writer holding the bucket's values.
-   private final OffsetGrowableWriter[] values;
-   private final float acceptableOverheadRatio;
+   private final LongValueCache[] values;
 
-   public SparsePackedMutable2(int maxValueCount, float acceptableOverheadRatio) {
+   public AbstractSparseMutable(int maxValueCount) {
       checkArgument(maxValueCount > 0, "Pre-condition violated: expression maxValueCount > 0 must be true.");
 
       // compute number of words
       int wordCount = OpenBitSet.bits2words(maxValueCount);
 
       this.words = new long[wordCount];
-      this.values = new OffsetGrowableWriter[wordCount];
-      this.acceptableOverheadRatio = acceptableOverheadRatio;
+      this.values = new LongValueCache[wordCount];
    }
 
    /**
@@ -79,8 +80,7 @@ public class SparsePackedMutable2 extends PackedInts.Mutable {
       if (values[i] == null) {
 
          // ensure growable writer is present
-         // TODO when creating the writer, pass internal representation into
-         values[i] = new OffsetGrowableWriter(2, 64, acceptableOverheadRatio);
+         values[i] = createNewValues();
       }
 
       // flip index
@@ -89,6 +89,8 @@ public class SparsePackedMutable2 extends PackedInts.Mutable {
       // set value in writer
       values[i].set(index % 64, value);
    }
+   
+   protected abstract LongValueCache createNewValues();
 
    /**
     * {@inheritDoc}. Returns the number of bits set in words.

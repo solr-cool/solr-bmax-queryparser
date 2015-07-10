@@ -39,7 +39,7 @@ public abstract class AbstractCachingComponent extends SearchComponent {
       this.param = param;
       this.componentName = param + ".cache";
       this.debugParamName = param + ".cached";
-      this.functionName = "cached" + param;
+      this.functionName = "cached";
    }
 
    /**
@@ -59,7 +59,7 @@ public abstract class AbstractCachingComponent extends SearchComponent {
          SolrCache<String, ValueSource> cache = rb.req.getSearcher().getCache(componentName);
 
          // more than one boost given
-         if (cache != null && boosts != null && boosts.length > 1) {
+         if (cache != null && boosts != null && boosts.length > 0) {
             try {
                String[] b = computeBoostFunction(rb, boosts, cache);
                
@@ -69,8 +69,6 @@ public abstract class AbstractCachingComponent extends SearchComponent {
                params.add("boost", b);
                params.set(debugParamName, boosts);
                rb.req.setParams(params);
-               
-               BmaxDebugInfo.add(rb, componentName, String.format(Locale.US, "Cache hit for %s, using %s", componentName, Arrays.toString(b)));
             } catch (Exception e) {
                throw new IOException(e);
             }
@@ -91,25 +89,33 @@ public abstract class AbstractCachingComponent extends SearchComponent {
       checkNotNull(boosts, "Pre-condition violated: boosts must not be null.");
       checkNotNull(cache, "Pre-condition violated: cache must not be null.");
 
-      // compile boost functions
-      ValueSource function = compileValueFunctions(rb, boosts);
+      // compute hash key for the boosts given
+      String key = computeHashKey(boosts);
+      String[] cachedBoosts = new String[] { String.format(Locale.US, "%s(%s,%s)", functionName, componentName, key) };
 
-      // check that we got a function query or we're doomed.
-      if (function != null) {
+      // no cached entry
+      if (cache.get(key) == null) {
 
-         // compute hash key for the boosts given
-         String key = computeHashKey(boosts);
+         // compile boost functions
+         ValueSource function = compileValueFunctions(rb, boosts);
+         
+         // check that we got a function query or we're doomed.
+         if (function != null) {
 
-         // place compiled functions into cache if not already present
-         if (cache.get(key) == null) {
+            // place function in cache
             cache.put(key, wrapInCachingValueSource(function, rb.req.getSearcher().maxDoc()));
+            BmaxDebugInfo.add(rb, componentName, String.format(Locale.US, "Created entry %s in cache %s for %s", key, componentName, Arrays.toString(boosts)));
+         } else {
+            BmaxDebugInfo.add(rb, componentName, String.format(Locale.US, "Could not compile %s function %s", componentName, Arrays.toString(boosts)));
+            
+            // in this case, revert to origin
+            cachedBoosts = boosts;
          }
-
-         // replace boost functions with a cached one
-         boosts = new String[] { String.format(Locale.US, "%s(%s,%s)", functionName, componentName, key) };
+      } else {
+         BmaxDebugInfo.add(rb, componentName, String.format(Locale.US, "Cache hit for %s, using %s", componentName, Arrays.toString(cachedBoosts)));
       }
-
-      return boosts;
+      
+      return cachedBoosts;
    }
 
    /**

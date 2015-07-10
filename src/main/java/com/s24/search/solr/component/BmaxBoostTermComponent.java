@@ -8,6 +8,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
 
+import org.apache.commons.lang.StringUtils;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.solr.common.params.CommonParams;
 import org.apache.solr.common.params.DisMaxParams;
@@ -39,14 +40,14 @@ public class BmaxBoostTermComponent extends SearchComponent {
    public static final String COMPONENT_NAME = "bmax.booster";
 
    // params
-   public static final String PENALIZE_EXTRA_TERMS = COMPONENT_NAME + ".penalize.extra";
-   public static final String PENALIZE_DOC_COUNT = COMPONENT_NAME + ".penalize.docs";
+   private static final String PENALIZE_EXTRA_TERMS = COMPONENT_NAME + ".penalize.extra";
+   private static final String PENALIZE_DOC_COUNT = COMPONENT_NAME + ".penalize.docs";
    private static final String PENALIZE_FACTOR = COMPONENT_NAME + ".penalize.factor";
-   public static final String PENALIZE_ENABLE = COMPONENT_NAME + ".penalize";
-   public static final String BOOST_EXTRA_TERMS = COMPONENT_NAME + ".boost.extra";
-   public static final String BOOST_ENABLE = COMPONENT_NAME + ".boost";
-   public static final String BOOST_FACTOR = COMPONENT_NAME + ".boost.factor";
-   public static final String SYNONYM_ENABLE = COMPONENT_NAME + ".synonyms";
+   private static final String PENALIZE_ENABLE = COMPONENT_NAME + ".penalize";
+   private static final String BOOST_EXTRA_TERMS = COMPONENT_NAME + ".boost.extra";
+   private static final String BOOST_ENABLE = COMPONENT_NAME + ".boost";
+   private static final String BOOST_FACTOR = COMPONENT_NAME + ".boost.factor";
+   private static final String SYNONYM_ENABLE = COMPONENT_NAME + ".synonyms";
 
    // (optional) synonym field
    private String synonymFieldType;
@@ -73,9 +74,15 @@ public class BmaxBoostTermComponent extends SearchComponent {
 
       // check component is activated
       if (rb.req.getParams().getBool(COMPONENT_NAME, false)) {
-         String q = rb.req.getParams().get(CommonParams.Q);
 
-         if (q != null && !"*:*".equals(q)) {
+         // check preconditions
+         String q = rb.req.getParams().get(CommonParams.Q);
+         String sort = rb.req.getParams().get(CommonParams.SORT);
+
+         if (q != null
+               && !"*:*".equals(q)
+               && (sort == null || (StringUtils.containsIgnoreCase(sort, "score") && StringUtils.containsIgnoreCase(
+                     sort, "desc")))) {
             prepareInternal(rb);
          }
       }
@@ -108,9 +115,9 @@ public class BmaxBoostTermComponent extends SearchComponent {
       if (synonyms) {
          q += " " + Joiner.on(' ').skipNulls().join(Terms.collect(q, synonymAnalyzer));
       }
-      
+
       // check boosts
-      if (boost) {
+      if (boost && rb.req.getParams().get("bq") == null) {
          Collection<CharSequence> terms = Terms.collect(q, boostAnalyzer);
 
          // add extra terms
@@ -130,7 +137,7 @@ public class BmaxBoostTermComponent extends SearchComponent {
       }
 
       // check penalizes
-      if (penalize) {
+      if (penalize && rb.req.getParams().get("rq") == null) {
          Collection<CharSequence> terms = Terms.collect(q, penalizeAnalyzer);
 
          // add extra terms

@@ -4,6 +4,8 @@ import static com.google.common.base.Preconditions.checkArgument;
 
 import java.util.Arrays;
 
+import org.apache.lucene.util.RamUsageEstimator;
+
 /**
  * Very simple, float array based implementation.
  * 
@@ -25,7 +27,7 @@ public class FloatArrayValueCache implements FloatValueCache {
     */
    @Override
    public long ramBytesUsed() {
-      return 4 * cache.length;
+      return RamUsageEstimator.sizeOf(cache);
    }
 
    /**

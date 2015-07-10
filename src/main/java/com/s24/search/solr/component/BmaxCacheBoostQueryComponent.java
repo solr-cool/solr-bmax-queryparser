@@ -10,6 +10,8 @@ import org.apache.solr.handler.component.ResponseBuilder;
 import org.apache.solr.search.QParser;
 import org.apache.solr.search.QParserPlugin;
 
+import com.s24.search.solr.functions.FloatCachingValueSource;
+
 /**
  * Replaces given boost queries with a single cached boost function.
  * 
@@ -23,9 +25,7 @@ public class BmaxCacheBoostQueryComponent extends AbstractCachingComponent {
 
    @Override
    protected ValueSource wrapInCachingValueSource(ValueSource function, int maxDocs) {
-      
-      // TODO wrap in sparse data structure
-      return super.wrapInCachingValueSource(function, maxDocs);
+      return new FloatCachingValueSource(function, maxDocs, FloatCachingValueSource.CACHE_SPARSE);
    }
    
    /**

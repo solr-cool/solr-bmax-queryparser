@@ -15,6 +15,7 @@ import org.apache.lucene.util.packed.PackedInts;
 import com.google.common.base.Objects;
 import com.s24.search.solr.util.FloatArrayValueCache;
 import com.s24.search.solr.util.FloatValueCache;
+import com.s24.search.solr.util.packed.FloatArraySparseMutable;
 import com.s24.search.solr.util.packed.OffsetGrowableFloatWriter;
 
 /**
@@ -24,8 +25,8 @@ import com.s24.search.solr.util.packed.OffsetGrowableFloatWriter;
 public class FloatCachingValueSource extends ValueSource {
 
    public static final int CACHE_FAST = 0;
-   public static final int CACHE_EFFICIENT = 1;
-   public static final int CACHE_MAX_EFFICIENT = 2;
+   public static final int CACHE_OFFSET_PACKED = 1;
+   public static final int CACHE_SPARSE = 2;
 
    private final ValueSource source;
    private final FloatValueCache cache;
@@ -47,12 +48,15 @@ public class FloatCachingValueSource extends ValueSource {
       if (CACHE_FAST == cacheHint) {
          // dead simple impl
          this.cache = new FloatArrayValueCache(maxDoc);
-      } else if (CACHE_EFFICIENT == cacheHint) {
+      } else if (CACHE_OFFSET_PACKED == cacheHint) {
          // mem efficient
          this.cache = new OffsetGrowableFloatWriter(
                OffsetGrowableFloatWriter.DEFAULT_PRECISION,
                4, maxDoc,
                PackedInts.DEFAULT);
+      } else if (CACHE_SPARSE == cacheHint) {
+         // mem efficient
+         this.cache = new FloatArraySparseMutable(maxDoc, FloatArraySparseMutable.DEFAULT_PRECISION);
       } else {
          // TODO max memory efficient, but not suitable for larger datasets
          this.cache = null;
@@ -116,6 +120,10 @@ public class FloatCachingValueSource extends ValueSource {
 
    @Override
    public String toString() {
-      return Objects.toStringHelper(this).add("source", source).toString();
+      return Objects.toStringHelper(this)
+            .add("cache.implementation", cache.getClass().getName())
+            .add("cache.size", cache.size())
+            .add("cache.bytes", cache.ramBytesUsed())
+            .toString();
    }
 }

@@ -6,6 +6,8 @@ import org.apache.lucene.search.DocIdSetIterator;
 import org.apache.lucene.util.OpenBitSet;
 import org.apache.lucene.util.packed.GrowableWriter;
 
+import com.s24.search.solr.util.LongValueCache;
+
 /**
  * A growable writer that works with a internal minimum value, that is added as
  * an offset to the values returned. Using this technique, we reduce the
@@ -13,7 +15,7 @@ import org.apache.lucene.util.packed.GrowableWriter;
  * 
  * @author Shopping24 GmbH, Torsten Bøgh Köster (@tboeghk)
  */
-public class OffsetGrowableWriter extends GrowableWriter {
+public class OffsetGrowableWriter extends GrowableWriter implements LongValueCache {
 
    // track ids that have been modified
    private final OpenBitSet valuesFilled;
@@ -46,7 +48,7 @@ public class OffsetGrowableWriter extends GrowableWriter {
    public long getCurrentMinimumValue() {
       return minimumValue;
    }
-
+   
    /**
     * Ensures that the value to add is above the current minimum value or
     * reduces the minimum value to the value given. In that case, alle values
