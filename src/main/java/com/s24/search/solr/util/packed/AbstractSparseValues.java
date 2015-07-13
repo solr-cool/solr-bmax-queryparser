@@ -1,11 +1,9 @@
 package com.s24.search.solr.util.packed;
 
 import static com.google.common.base.Preconditions.checkArgument;
-import static com.google.common.base.Preconditions.checkNotNull;
 
 import org.apache.lucene.util.OpenBitSet;
 import org.apache.lucene.util.RamUsageEstimator;
-import org.apache.lucene.util.packed.PackedInts;
 
 import com.s24.search.solr.util.LongValueCache;
 
@@ -14,7 +12,7 @@ import com.s24.search.solr.util.LongValueCache;
  * 
  * @author Shopping24 GmbH, Torsten Bøgh Köster (@tboeghk)
  */
-public abstract class AbstractSparseMutable extends PackedInts.Mutable {
+public abstract class AbstractSparseValues implements LongValueCache {
 
    // holds the per-bucket bits
    private final long[] words;
@@ -22,7 +20,7 @@ public abstract class AbstractSparseMutable extends PackedInts.Mutable {
    // each word bucket is associated with a writer holding the bucket's values.
    private final LongValueCache[] values;
 
-   public AbstractSparseMutable(int maxValueCount) {
+   public AbstractSparseValues(int maxValueCount) {
       checkArgument(maxValueCount > 0, "Pre-condition violated: expression maxValueCount > 0 must be true.");
 
       // compute number of words
@@ -46,6 +44,16 @@ public abstract class AbstractSparseMutable extends PackedInts.Mutable {
       }
 
       return bytes;
+   }
+
+   @Override
+   public boolean hasValue(int index) {
+      checkArgument(index >= 0, "Pre-condition violated: expression index >= 0 must be true.");
+
+      // get word by div 64
+      int i = index >> 6;
+
+      return ((words[i] & (1L << index)) != 0);
    }
 
    /**
@@ -89,7 +97,7 @@ public abstract class AbstractSparseMutable extends PackedInts.Mutable {
       // set value in writer
       values[i].set(index % 64, value);
    }
-   
+
    protected abstract LongValueCache createNewValues();
 
    /**
@@ -110,12 +118,16 @@ public abstract class AbstractSparseMutable extends PackedInts.Mutable {
    public long get(int index) {
       checkArgument(index >= 0, "Pre-condition violated: expression index >= 0 must be true.");
 
-      // get word by div 64
-      int i = index >> 6;
-      checkNotNull(values[i], "Pre-condition violated: values[i] must not be null.");
+      // check for value
+      if (hasValue(index)) {
+         // get word by div 64
+         int i = index >> 6;
 
-      // get value in writer
-      return values[i].get(index % 64);
+         // get value in writer
+         return values[i].get(index % 64);
+      }
+
+      return Long.MAX_VALUE;
    }
 
 }

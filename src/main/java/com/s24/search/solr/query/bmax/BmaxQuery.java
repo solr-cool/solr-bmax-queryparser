@@ -26,6 +26,8 @@ public class BmaxQuery {
    private float synonymBoost = 0.1f;
    private float subtopicBoost = 0.01f;
    private float tieBreakerMultiplier = 0.0f;
+   private boolean inspectTerms = false;
+   private int maxInspectTerms = 1024;
 
    public Map<String, Float> getFieldsAndBoosts() {
       return fieldsAndBoosts;
@@ -57,6 +59,22 @@ public class BmaxQuery {
 
    public void setTieBreakerMultiplier(float tieBreakerMultiplier) {
       this.tieBreakerMultiplier = tieBreakerMultiplier;
+   }
+
+   public int getMaxInspectTerms() {
+      return maxInspectTerms;
+   }
+
+   public void setMaxInspectTerms(int maxInspectTerms) {
+      this.maxInspectTerms = maxInspectTerms;
+   }
+
+   public boolean isInspectTerms() {
+      return inspectTerms;
+   }
+
+   public void setInspectTerms(boolean inspectTerms) {
+      this.inspectTerms = inspectTerms;
    }
 
    public static final Function<BmaxTerm, CharSequence> toQueryTerm = new Function<BmaxQuery.BmaxTerm, CharSequence>() {

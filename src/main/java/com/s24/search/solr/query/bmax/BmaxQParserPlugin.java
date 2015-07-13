@@ -39,6 +39,7 @@ public class BmaxQParserPlugin extends QParserPlugin {
       subtopicFieldType = (String) args.get("subtopicFieldType");
    }
 
+   @SuppressWarnings("unchecked")
    @Override
    public QParser createParser(String qstr, SolrParams localParams, SolrParams params, SolrQueryRequest req) {
       checkNotNull(req, "Pre-condition violated: req must not be null.");
@@ -63,6 +64,6 @@ public class BmaxQParserPlugin extends QParserPlugin {
       } 
       
       return new BmaxQueryParser(qstr, localParams, req.getParams(), req, queryParsingAnalyzer, 
-            synonymAnalyzer, subtopicAnalyzer);
+            synonymAnalyzer, subtopicAnalyzer, req.getSearcher().getCache("bmax.fieldTermCache"));
    }
 }

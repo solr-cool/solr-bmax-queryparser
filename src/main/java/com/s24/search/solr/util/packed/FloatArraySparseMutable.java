@@ -38,13 +38,4 @@ public class FloatArraySparseMutable extends LongArraySparseMutable implements F
 
       return Float.NaN;
    }
-   
-   /**
-    * {@inheritDoc}
-    */
-   @Override
-   public boolean hasValue(int index) {
-      return get(index) == Long.MAX_VALUE;
-   }
-
 }

@@ -20,7 +20,7 @@ import com.s24.search.solr.functions.FloatCachingValueSource;
 public class BmaxCacheBoostQueryComponent extends AbstractCachingComponent {
 
    public BmaxCacheBoostQueryComponent() {
-      super("bq");
+      super("bq", "bf");
    }
 
    @Override

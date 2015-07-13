@@ -2,7 +2,12 @@ package com.s24.search.solr.query.bmax;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
+import java.util.Map.Entry;
+
 import org.apache.lucene.analysis.Analyzer;
+import org.apache.lucene.index.SortedDocValues;
+import org.apache.lucene.index.TermsEnum;
+import org.apache.lucene.search.FieldCache;
 import org.apache.lucene.search.Query;
 import org.apache.solr.common.params.DisMaxParams;
 import org.apache.solr.common.params.SolrParams;
@@ -10,6 +15,7 @@ import org.apache.solr.handler.component.ResponseBuilder;
 import org.apache.solr.request.SolrQueryRequest;
 import org.apache.solr.request.SolrRequestInfo;
 import org.apache.solr.search.ExtendedDismaxQParser;
+import org.apache.solr.search.SolrCache;
 import org.apache.solr.search.SyntaxError;
 import org.apache.solr.util.SolrPluginUtils;
 
@@ -19,17 +25,22 @@ import com.google.common.collect.Iterables;
 import com.s24.search.solr.query.bmax.BmaxQuery.BmaxTerm;
 import com.s24.search.solr.util.BmaxDebugInfo;
 
+import eu.danieldk.dictomaton.DictionaryBuilder;
+
 public class BmaxQueryParser extends ExtendedDismaxQParser {
 
    public static final String PARAM_SYNONYM_BOOST = "bmax.synonym.boost";
    public static final String PARAM_SUBTOPIC_BOOST = "bmax.subtopic.boost";
    public static final String PARAM_TIE = "bmax.term.tie";
+   public static final String PARAM_INSPECT_TERMS = "bmax.inspect";
+   public static final String PARAM_INSPECT_MAX_TERMS = "bmax.inspect.maxterms";
 
    private static final String WILDCARD = "*:*";
 
    private final Analyzer synonymAnalyzer;
    private final Analyzer subtopicAnalyzer;
    private final Analyzer queryParsingAnalyzer;
+   private final SolrCache<String, BmaxTermCacheEntry> fieldTermCache;
 
    /**
     * Creates a new {@linkplain BmaxQueryParser}.
@@ -46,7 +57,8 @@ public class BmaxQueryParser extends ExtendedDismaxQParser {
     * @param boostDownAnalyzer
     */
    public BmaxQueryParser(String qstr, SolrParams localParams, SolrParams params, SolrQueryRequest req,
-         Analyzer queryParsingAnalyzer, Analyzer synonymAnalyzer, Analyzer subtopicAnalyzer) {
+         Analyzer queryParsingAnalyzer, Analyzer synonymAnalyzer, Analyzer subtopicAnalyzer,
+         SolrCache<String, BmaxTermCacheEntry> fieldTermCache) {
       super(qstr, localParams, params, req);
 
       // mandatory
@@ -56,10 +68,12 @@ public class BmaxQueryParser extends ExtendedDismaxQParser {
       // optional args
       this.synonymAnalyzer = synonymAnalyzer;
       this.subtopicAnalyzer = subtopicAnalyzer;
+      this.fieldTermCache = fieldTermCache;
    }
 
    @Override
    public Query parse() throws SyntaxError {
+      // parse query
       BmaxQuery query = analyzeQuery();
 
       // save debug stuff
@@ -74,12 +88,59 @@ public class BmaxQueryParser extends ExtendedDismaxQParser {
                Joiner.on(' ').join(Iterables.concat(Iterables.transform(query.getTerms(), BmaxQuery.toSubtopics))));
       }
 
-      // create query
-      return new BmaxLuceneQueryBuilder(query)
+      // analyze terms
+      if (query.isInspectTerms() && fieldTermCache != null) {
+         try {
+            analyzeQueryFields(query);
+         } catch (Exception e) {
+            throw new SyntaxError(e);
+         }
+      }
+
+      // build query
+      Query result = new BmaxLuceneQueryBuilder(query)
             .withMultiplicativeBoost(getMultiplicativeBoosts())
+            .withBoostFunctions(getBoostFunctions())
             .withBoostQueries(getBoostQueries())
             .withSchema(getReq().getSchema())
+            .withFieldTermCache(fieldTermCache)
             .build();
+      return result;
+   }
+
+   protected void analyzeQueryFields(BmaxQuery query) throws Exception {
+      checkNotNull(query, "Pre-condition violated: query must not be null.");
+
+      // iterate query fields
+      for (Entry<String, Float> field : query.getFieldsAndBoosts().entrySet()) {
+
+         // fill on cache miss
+         BmaxTermCacheEntry cache = fieldTermCache.get(field.getKey());
+         if (cache == null) {
+
+            // check the number of terms for the field. If below the configured
+            // threshold, build a dictomaton lookup
+            SortedDocValues values = FieldCache.DEFAULT.getTermsIndex(getReq().getSearcher().getAtomicReader(),
+                  field.getKey());
+
+            // inspect and precache terms
+            if (values.getValueCount() < query.getMaxInspectTerms()) {
+               DictionaryBuilder builder = new DictionaryBuilder();
+
+               // iterate values and add to dictionary
+               TermsEnum terms = values.termsEnum();
+               while (terms.next() != null) {
+                  builder.add(terms.term().utf8ToString());
+               }
+
+               // add computed dictionary
+               fieldTermCache
+                     .put(field.getKey(), new BmaxTermCacheEntry(builder.build(), values.getValueCount(), true));
+            } else {
+               fieldTermCache.put(field.getKey(), new BmaxTermCacheEntry(values.getValueCount()));
+            }
+         }
+      }
    }
 
    protected BmaxQuery analyzeQuery() {
@@ -89,6 +150,8 @@ public class BmaxQueryParser extends ExtendedDismaxQParser {
       query.setSynonymBoost(getReq().getParams().getFloat(PARAM_SYNONYM_BOOST, 0.1f));
       query.setSubtopicBoost(getReq().getParams().getFloat(PARAM_SUBTOPIC_BOOST, 0.01f));
       query.setTieBreakerMultiplier(getReq().getParams().getFloat(PARAM_TIE, 0.00f));
+      query.setInspectTerms(getReq().getParams().getBool(PARAM_INSPECT_TERMS, false));
+      query.setMaxInspectTerms(getReq().getParams().getInt(PARAM_INSPECT_MAX_TERMS, 1024 * 8));
 
       try {
          // extract fields and boost
@@ -114,8 +177,7 @@ public class BmaxQueryParser extends ExtendedDismaxQParser {
                   bt.getSynonyms().addAll(Terms.collect(term, synonymAnalyzer));
                }
 
-               // add subtopics. Effectivly, synonyms and subtopics are treated
-               // the same.
+               // add subtopics.
                if (subtopicAnalyzer != null) {
                   bt.getSubtopics().addAll(Terms.collect(term, subtopicAnalyzer));
 

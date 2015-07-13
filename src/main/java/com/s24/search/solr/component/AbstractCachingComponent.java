@@ -26,17 +26,24 @@ import com.s24.search.solr.util.BmaxDebugInfo;
  */
 public abstract class AbstractCachingComponent extends SearchComponent {
 
-// the param to cache. This will be use as cache prefix
+   // the param to cache. This will be use as cache prefix
    private final String param;
+   private final String replaceParam;
 
    private final String componentName;
    private final String functionName;
    private final String debugParamName;
 
    public AbstractCachingComponent(String param) {
+      this(param, param);
+   }
+
+   public AbstractCachingComponent(String param, String replaceParam) {
       checkNotNull(param, "Pre-condition violated: param must not be null.");
+      checkNotNull(replaceParam, "Pre-condition violated: replaceParam must not be null.");
 
       this.param = param;
+      this.replaceParam = replaceParam;
       this.componentName = param + ".cache";
       this.debugParamName = param + ".cached";
       this.functionName = "cached";
@@ -62,11 +69,11 @@ public abstract class AbstractCachingComponent extends SearchComponent {
          if (cache != null && boosts != null && boosts.length > 0) {
             try {
                String[] b = computeBoostFunction(rb, boosts, cache);
-               
+
                // replace all boosts with the new, cached boost function
                ModifiableSolrParams params = new ModifiableSolrParams(rb.req.getParams());
                params.remove(param);
-               params.add("boost", b);
+               params.add(replaceParam, b);
                params.set(debugParamName, boosts);
                rb.req.setParams(params);
             } catch (Exception e) {
@@ -98,23 +105,29 @@ public abstract class AbstractCachingComponent extends SearchComponent {
 
          // compile boost functions
          ValueSource function = compileValueFunctions(rb, boosts);
-         
+
          // check that we got a function query or we're doomed.
          if (function != null) {
 
             // place function in cache
             cache.put(key, wrapInCachingValueSource(function, rb.req.getSearcher().maxDoc()));
-            BmaxDebugInfo.add(rb, componentName, String.format(Locale.US, "Created entry %s in cache %s for %s", key, componentName, Arrays.toString(boosts)));
+            BmaxDebugInfo.add(
+                  rb,
+                  componentName,
+                  String.format(Locale.US, "Created entry %s in cache %s for %s", key, componentName,
+                        Arrays.toString(boosts)));
          } else {
-            BmaxDebugInfo.add(rb, componentName, String.format(Locale.US, "Could not compile %s function %s", componentName, Arrays.toString(boosts)));
-            
+            BmaxDebugInfo.add(rb, componentName,
+                  String.format(Locale.US, "Could not compile %s function %s", componentName, Arrays.toString(boosts)));
+
             // in this case, revert to origin
             cachedBoosts = boosts;
          }
       } else {
-         BmaxDebugInfo.add(rb, componentName, String.format(Locale.US, "Cache hit for %s, using %s", componentName, Arrays.toString(cachedBoosts)));
+         BmaxDebugInfo.add(rb, componentName,
+               String.format(Locale.US, "Cache hit for %s, using %s", componentName, Arrays.toString(cachedBoosts)));
       }
-      
+
       return cachedBoosts;
    }
 

@@ -18,6 +18,7 @@ import org.apache.lucene.search.MatchAllDocsQuery;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.search.TermQuery;
 import org.apache.solr.schema.IndexSchema;
+import org.apache.solr.search.SolrCache;
 
 import com.google.common.collect.Sets;
 import com.s24.search.solr.query.bmax.BmaxQuery.BmaxTerm;
@@ -34,7 +35,9 @@ public class BmaxLuceneQueryBuilder {
    private final BmaxQuery bmaxquery;
    private List<ValueSource> multiplicativeBoost;
    private List<Query> boostQueries;
+   private List<Query> additiveBoostFunctions;
    private IndexSchema schema;
+   private SolrCache<String, BmaxTermCacheEntry> fieldTermCache;
 
    public BmaxLuceneQueryBuilder(BmaxQuery bmaxQuery) {
       checkNotNull(bmaxQuery, "Pre-condition violated: bmaxQuery must not be null.");
@@ -42,10 +45,22 @@ public class BmaxLuceneQueryBuilder {
       this.bmaxquery = bmaxQuery;
    }
 
+   public BmaxLuceneQueryBuilder withFieldTermCache(SolrCache<String, BmaxTermCacheEntry> fieldTermCache) {
+      this.fieldTermCache = fieldTermCache;
+      return this;
+   }
+
    public BmaxLuceneQueryBuilder withBoostQueries(List<Query> boostQueries) {
       checkNotNull(boostQueries, "Pre-condition violated: boostQueries must not be null.");
 
       this.boostQueries = boostQueries;
+      return this;
+   }
+
+   public BmaxLuceneQueryBuilder withBoostFunctions(List<Query> boostFunctions) {
+      checkNotNull(boostFunctions, "Pre-condition violated: boostFunctions must not be null.");
+
+      this.additiveBoostFunctions = boostFunctions;
       return this;
    }
 
@@ -103,9 +118,16 @@ public class BmaxLuceneQueryBuilder {
          bq.add(new BooleanClause(buildDismaxQuery(term), Occur.MUST));
       }
 
-      // add boostings
+      // add boost queries
       if (boostQueries != null) {
          for (Query f : boostQueries) {
+            bq.add(f, BooleanClause.Occur.SHOULD);
+         }
+      }
+
+      // add additive boost function
+      if (additiveBoostFunctions != null) {
+         for (Query f : additiveBoostFunctions) {
             bq.add(f, BooleanClause.Occur.SHOULD);
          }
       }
@@ -173,7 +195,23 @@ public class BmaxLuceneQueryBuilder {
       Collection<Query> queries = Sets.newHashSet();
 
       for (Term term : terms) {
-         queries.add(buildTermQuery(term, bmaxquery.getFieldsAndBoosts().get(field) * extraBoost));
+         BmaxTermCacheEntry cache = null;
+
+         // check for term inspection && available term cache
+         if (bmaxquery.isInspectTerms() && fieldTermCache != null) {
+
+            // or on activated term inspection
+            cache = fieldTermCache.get(field);
+         }
+
+         // add if dictionary is missing or field should not be cached
+         if (cache == null || !cache.isCache()) {
+            queries.add(buildTermQuery(term, bmaxquery.getFieldsAndBoosts().get(field) * extraBoost));
+         } else if (cache != null && cache.isCache() && cache.getTerms().contains(term.text())) {
+
+            // if field terms are cached, add term query only if necessary
+            queries.add(buildTermQuery(term, bmaxquery.getFieldsAndBoosts().get(field) * extraBoost));
+         }
       }
 
       return queries;

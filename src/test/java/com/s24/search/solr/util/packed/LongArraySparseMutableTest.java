@@ -1,6 +1,8 @@
 package com.s24.search.solr.util.packed;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
 import java.text.NumberFormat;
 
@@ -15,17 +17,19 @@ public class LongArraySparseMutableTest {
 
    @Test
    public void testSize() {
-      AbstractSparseMutable mutable = new LongArraySparseMutable(1024);
+      AbstractSparseValues mutable = new LongArraySparseMutable(1024);
       assertEquals(0, mutable.size());
    }
 
    @Test
    public void testSequentialGetSet() throws Exception {
-      AbstractSparseMutable mutable = new LongArraySparseMutable(1024);
+      AbstractSparseValues mutable = new LongArraySparseMutable(1024);
 
       for (int i = 0; i < mutable.size(); i++) {
          long value = RandomUtils.nextLong();
+         assertFalse(mutable.hasValue(i));
          mutable.set(i, value);
+         assertTrue(mutable.hasValue(i));
          assertEquals(value, mutable.get(i));
       }
    }
@@ -37,7 +41,7 @@ public class LongArraySparseMutableTest {
 
       // sparse packed
       long start = System.currentTimeMillis();
-      final AbstractSparseMutable sparse = new LongArraySparseMutable(FILL_DOCS);
+      final AbstractSparseValues sparse = new LongArraySparseMutable(FILL_DOCS);
       for (int i = 0; i < FILL_DOCS; i++) {
          final int index = i;
          final long value = RandomUtils.nextInt(FILL_DOCS);
