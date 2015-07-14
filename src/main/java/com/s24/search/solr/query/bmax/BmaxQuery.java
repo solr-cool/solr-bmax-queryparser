@@ -27,6 +27,7 @@ public class BmaxQuery {
    private float subtopicBoost = 0.01f;
    private float tieBreakerMultiplier = 0.0f;
    private boolean inspectTerms = false;
+   private boolean buildTermsInspectionCache = false;
    private int maxInspectTerms = 1024;
 
    public Map<String, Float> getFieldsAndBoosts() {
@@ -75,6 +76,14 @@ public class BmaxQuery {
 
    public void setInspectTerms(boolean inspectTerms) {
       this.inspectTerms = inspectTerms;
+   }
+
+   public boolean isBuildTermsInspectionCache() {
+      return buildTermsInspectionCache;
+   }
+
+   public void setBuildTermsInspectionCache(boolean buildTermsInspectionCache) {
+      this.buildTermsInspectionCache = buildTermsInspectionCache;
    }
 
    public static final Function<BmaxTerm, CharSequence> toQueryTerm = new Function<BmaxQuery.BmaxTerm, CharSequence>() {

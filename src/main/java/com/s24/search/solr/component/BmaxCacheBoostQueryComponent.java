@@ -8,7 +8,6 @@ import org.apache.lucene.queries.function.valuesource.QueryValueSource;
 import org.apache.lucene.search.Query;
 import org.apache.solr.handler.component.ResponseBuilder;
 import org.apache.solr.search.QParser;
-import org.apache.solr.search.QParserPlugin;
 
 import com.s24.search.solr.functions.FloatCachingValueSource;
 
@@ -27,7 +26,7 @@ public class BmaxCacheBoostQueryComponent extends AbstractCachingComponent {
    protected ValueSource wrapInCachingValueSource(ValueSource function, int maxDocs) {
       return new FloatCachingValueSource(function, maxDocs, FloatCachingValueSource.CACHE_SPARSE);
    }
-   
+
    /**
     * {@inheritDoc}
     */
@@ -40,8 +39,13 @@ public class BmaxCacheBoostQueryComponent extends AbstractCachingComponent {
 
       // iterate boost params
       for (int i = 0; i < boosts.length; i++) {
-         Query q = QParser.getParser(boosts[i], QParserPlugin.DEFAULT_QTYPE, rb.req).getQuery();
-         functions[i] = new QueryValueSource(q, 1f);
+         Query q = QParser.getParser(boosts[i], null, rb.req).getQuery();
+         functions[i] = new QueryValueSource(q, 0f);
+      }
+
+      // do not encapsulate unnecessary
+      if (functions.length == 1) {
+         return functions[0];
       }
 
       // compute a product of all value sources function.

@@ -38,11 +38,16 @@ public class BmaxLuceneQueryBuilder {
    private List<Query> additiveBoostFunctions;
    private IndexSchema schema;
    private SolrCache<String, BmaxTermCacheEntry> fieldTermCache;
+   private int queryClauseCount = 0;
 
    public BmaxLuceneQueryBuilder(BmaxQuery bmaxQuery) {
       checkNotNull(bmaxQuery, "Pre-condition violated: bmaxQuery must not be null.");
 
       this.bmaxquery = bmaxQuery;
+   }
+
+   public int getQueryClauseCount() {
+      return queryClauseCount;
    }
 
    public BmaxLuceneQueryBuilder withFieldTermCache(SolrCache<String, BmaxTermCacheEntry> fieldTermCache) {
@@ -224,6 +229,7 @@ public class BmaxLuceneQueryBuilder {
       checkNotNull(term, "Pre-condition violated: term must not be null.");
 
       TermQuery query = new TermQuery(term);
+      queryClauseCount++;
 
       // set boost
       if (boost > 0f) {

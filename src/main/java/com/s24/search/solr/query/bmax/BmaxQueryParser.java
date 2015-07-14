@@ -2,6 +2,7 @@ package com.s24.search.solr.query.bmax;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
+import java.util.Locale;
 import java.util.Map.Entry;
 
 import org.apache.lucene.analysis.Analyzer;
@@ -20,6 +21,7 @@ import org.apache.solr.search.SyntaxError;
 import org.apache.solr.util.SolrPluginUtils;
 
 import com.google.common.base.Joiner;
+import com.google.common.base.Predicates;
 import com.google.common.collect.Collections2;
 import com.google.common.collect.Iterables;
 import com.s24.search.solr.query.bmax.BmaxQuery.BmaxTerm;
@@ -31,8 +33,9 @@ public class BmaxQueryParser extends ExtendedDismaxQParser {
 
    public static final String PARAM_SYNONYM_BOOST = "bmax.synonym.boost";
    public static final String PARAM_SUBTOPIC_BOOST = "bmax.subtopic.boost";
-   public static final String PARAM_TIE = "bmax.term.tie";
+   public static final String PARAM_TIE = DisMaxParams.TIE;
    public static final String PARAM_INSPECT_TERMS = "bmax.inspect";
+   public static final String PARAM_BUILD_INSPECT_TERMS = "bmax.inspect.build";
    public static final String PARAM_INSPECT_MAX_TERMS = "bmax.inspect.maxterms";
 
    private static final String WILDCARD = "*:*";
@@ -76,35 +79,46 @@ public class BmaxQueryParser extends ExtendedDismaxQParser {
       // parse query
       BmaxQuery query = analyzeQuery();
 
-      // save debug stuff
-      if (SolrRequestInfo.getRequestInfo() != null) {
-         ResponseBuilder rb = SolrRequestInfo.getRequestInfo().getResponseBuilder();
-
-         BmaxDebugInfo.add(rb, "bmax.query",
-               Joiner.on(' ').join(Collections2.transform(query.getTerms(), BmaxQuery.toQueryTerm)));
-         BmaxDebugInfo.add(rb, "bmax.synonyms",
-               Joiner.on(' ').join(Iterables.concat(Iterables.transform(query.getTerms(), BmaxQuery.toSynonyms))));
-         BmaxDebugInfo.add(rb, "bmax.subtocpics",
-               Joiner.on(' ').join(Iterables.concat(Iterables.transform(query.getTerms(), BmaxQuery.toSubtopics))));
-      }
-
       // analyze terms
-      if (query.isInspectTerms() && fieldTermCache != null) {
+      if (query.isBuildTermsInspectionCache() && fieldTermCache != null) {
          try {
+            long start = System.currentTimeMillis();
             analyzeQueryFields(query);
+            
+            // add debug
+            if (SolrRequestInfo.getRequestInfo() != null) {
+               ResponseBuilder rb = SolrRequestInfo.getRequestInfo().getResponseBuilder();
+               BmaxDebugInfo.add(rb, "bmax.inspect", String.format(Locale.US, "Built term inspection cache in %sms", (System.currentTimeMillis() - start)));
+            }
          } catch (Exception e) {
             throw new SyntaxError(e);
          }
       }
 
       // build query
-      Query result = new BmaxLuceneQueryBuilder(query)
+      BmaxLuceneQueryBuilder queryBuilder = new BmaxLuceneQueryBuilder(query);
+      Query result = queryBuilder
             .withMultiplicativeBoost(getMultiplicativeBoosts())
             .withBoostFunctions(getBoostFunctions())
             .withBoostQueries(getBoostQueries())
             .withSchema(getReq().getSchema())
             .withFieldTermCache(fieldTermCache)
             .build();
+      
+      // save debug stuff
+      if (SolrRequestInfo.getRequestInfo() != null) {
+         ResponseBuilder rb = SolrRequestInfo.getRequestInfo().getResponseBuilder();
+         
+         BmaxDebugInfo.add(rb, "bmax.query",
+               Joiner.on(' ').join(Collections2.transform(query.getTerms(), BmaxQuery.toQueryTerm)));
+         BmaxDebugInfo.add(rb, "bmax.synonyms",
+               Joiner.on(' ').join(Iterables.concat(Iterables.transform(query.getTerms(), BmaxQuery.toSynonyms))));
+         BmaxDebugInfo.add(rb, "bmax.subtocpics",
+               Joiner.on(' ').join(Iterables.concat(Iterables.transform(query.getTerms(), BmaxQuery.toSubtopics))));
+         BmaxDebugInfo.add(rb, "bmax.queryClauseCount", String.valueOf(queryBuilder.getQueryClauseCount()));
+      }
+      
+      // done
       return result;
    }
 
@@ -152,6 +166,7 @@ public class BmaxQueryParser extends ExtendedDismaxQParser {
       query.setTieBreakerMultiplier(getReq().getParams().getFloat(PARAM_TIE, 0.00f));
       query.setInspectTerms(getReq().getParams().getBool(PARAM_INSPECT_TERMS, false));
       query.setMaxInspectTerms(getReq().getParams().getInt(PARAM_INSPECT_MAX_TERMS, 1024 * 8));
+      query.setBuildTermsInspectionCache(getReq().getParams().getBool(PARAM_BUILD_INSPECT_TERMS, false));
 
       try {
          // extract fields and boost
@@ -174,7 +189,9 @@ public class BmaxQueryParser extends ExtendedDismaxQParser {
 
                // add synonyms and extra synonyms
                if (synonymAnalyzer != null) {
-                  bt.getSynonyms().addAll(Terms.collect(term, synonymAnalyzer));
+                  bt.getSynonyms().addAll(Collections2.filter(
+                        Terms.collect(term, synonymAnalyzer), 
+                        Predicates.not(Predicates.equalTo(term))));
                }
 
                // add subtopics.
