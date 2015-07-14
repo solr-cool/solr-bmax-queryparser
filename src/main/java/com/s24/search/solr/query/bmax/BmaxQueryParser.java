@@ -21,6 +21,7 @@ import org.apache.solr.search.SyntaxError;
 import org.apache.solr.util.SolrPluginUtils;
 
 import com.google.common.base.Joiner;
+import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
 import com.google.common.collect.Collections2;
 import com.google.common.collect.Iterables;
@@ -84,11 +85,12 @@ public class BmaxQueryParser extends ExtendedDismaxQParser {
          try {
             long start = System.currentTimeMillis();
             analyzeQueryFields(query);
-            
+
             // add debug
             if (SolrRequestInfo.getRequestInfo() != null) {
                ResponseBuilder rb = SolrRequestInfo.getRequestInfo().getResponseBuilder();
-               BmaxDebugInfo.add(rb, "bmax.inspect", String.format(Locale.US, "Built term inspection cache in %sms", (System.currentTimeMillis() - start)));
+               BmaxDebugInfo.add(rb, "bmax.inspect", String.format(Locale.US, "Built term inspection cache in %sms",
+                     (System.currentTimeMillis() - start)));
             }
          } catch (Exception e) {
             throw new SyntaxError(e);
@@ -104,11 +106,11 @@ public class BmaxQueryParser extends ExtendedDismaxQParser {
             .withSchema(getReq().getSchema())
             .withFieldTermCache(fieldTermCache)
             .build();
-      
+
       // save debug stuff
       if (SolrRequestInfo.getRequestInfo() != null) {
          ResponseBuilder rb = SolrRequestInfo.getRequestInfo().getResponseBuilder();
-         
+
          BmaxDebugInfo.add(rb, "bmax.query",
                Joiner.on(' ').join(Collections2.transform(query.getTerms(), BmaxQuery.toQueryTerm)));
          BmaxDebugInfo.add(rb, "bmax.synonyms",
@@ -117,7 +119,7 @@ public class BmaxQueryParser extends ExtendedDismaxQParser {
                Joiner.on(' ').join(Iterables.concat(Iterables.transform(query.getTerms(), BmaxQuery.toSubtopics))));
          BmaxDebugInfo.add(rb, "bmax.queryClauseCount", String.valueOf(queryBuilder.getQueryClauseCount()));
       }
-      
+
       // done
       return result;
    }
@@ -182,7 +184,7 @@ public class BmaxQueryParser extends ExtendedDismaxQParser {
 
          // iterate terms
          if (!WILDCARD.equals(getString())) {
-            for (CharSequence term : Terms.collect(getString(), queryParsingAnalyzer)) {
+            for (final CharSequence term : Terms.collect(getString(), queryParsingAnalyzer)) {
 
                // create bmax representation
                BmaxTerm bt = new BmaxTerm(term);
@@ -190,8 +192,13 @@ public class BmaxQueryParser extends ExtendedDismaxQParser {
                // add synonyms and extra synonyms
                if (synonymAnalyzer != null) {
                   bt.getSynonyms().addAll(Collections2.filter(
-                        Terms.collect(term, synonymAnalyzer), 
-                        Predicates.not(Predicates.equalTo(term))));
+                        Terms.collect(term, synonymAnalyzer),
+                        Predicates.not(new Predicate<CharSequence>() {
+                           @Override
+                           public boolean apply(CharSequence t) {
+                              return t.toString().equals(term.toString());
+                           }
+                        })));
                }
 
                // add subtopics.
