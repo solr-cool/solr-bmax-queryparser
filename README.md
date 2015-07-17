@@ -3,42 +3,78 @@ The boosting dismax query parser (bmax)
 
 ![travis ci build status](https://travis-ci.org/shopping24/solr-bmax-queryparser.png)
 
-A boosting dismax query parser for Apache Solr. The bmax query parser relies on
-field types and tokenizer chains to parse the user query, discover synonyms, boost 
-and penalize terms at query time. Hence it is highly configurable. It does *not accept* any lucene query syntax (`~-+()`). The query composed is a dismax query with a minimum must match of 100%.
+A synonym aware edismax query parser for Apache Solr. The bmax query parser relies on
+field types and tokenizer chains to parse the user query, discovers synonyms, boost 
+and penalize terms at query time. Hence it is highly configurable. 
 
-## bmax query processing
+It does *not accept* any lucene query syntax (`~-+()`). The query composed is a dismax query 
+with a minimum must match of 100%.
 
-Query processing in the bmax query parser is split into 2 steps. First is parsing and tokenizing the input query. Second is synonym and boost term lookup.
+This document covers Version 1.5.x and onwards. For the old 0.9.9 version, [take a look at
+the release branch](https://github.com/shopping24/solr-bmax-queryparser/blob/v0.9.8/README.md).
+
+## Bmax query processing
+Query processing in the bmax query parser is split into 2 steps:
+
+1. First is retrieving and supplying boost and penalize terms. This is done in the
+    `BmaxBoostTermComponent`
+1. Second is parsing the incoming query and building an appropriate Lucene query.
+   This is done in the `BmaxQueryParser`.
+
+### 1. Retrieving boost and penalize terms
+The incoming user query (`q`) is analyzed and boost terms are supplied in the `bq` parameter.
+Penalize terms are added in the `rq` and `rqq` parameter to form a negative rerank query.
+Boost and penalize term retrieval is done in 3 steps:
+
+1. Run the incoming query in `q` through the configured `queryParsingFieldType`
+1. Expand synonyms for each query token through `synonymFieldType`.
+1. Retrieve boost and penalize terms for each token through
+   `boostTermFieldType` and `penalizeTermFieldType` respectivly.
+
+![image](./bmax_booster.png)
+
+Given the example above with `q=blue bike cheap` the query parsing field type would
+remove noise and leave `blue bike`. The synonym lookup would retrieve `bicycle` as
+synonym for `bike` and append it: `blue bike bicylce`. This would be the input for
+penalize and boost term discovery.
+
+The discovered boost terms `crossbike bmx pedelec` are appended to the incoming query
+as a boost query `bq={!dismax qf='...' mm=1 bq=''} crossbike bmx pedelec`. The discovered
+penalize terms are appended as rerank query `rq={!rerank reRankQuery=$rqq reRankDocs=... reRankWeight=...}&rqq=...book OR toys ...`. The rerank query formulated is a boolean OR query.
+
+### 2. Parsing the user query
+The bmax query parser utilizes the `edismax` query parser to build it's query. It recognizes the well known `edismax` parameters:
+
+* `q` – the main query
+* `qf` – query fields (weighted)
+* `bq` – the boost query (additive)
+* `bf` – boost functions (additive)
+* `boost` – boost functions (multiplicative)
+
+Rerank queries are realized through the default Solr rerank postfilter. Query parsing
+is done in 3 steps:
+
+1. Run the incoming query in `q` through the configured `queryParsingFieldType`
+1. Expand synonyms for each query token through `synonymFieldType`. Synoynms treated 
+   as sematically equal to the source token.
+1. Retrieve subtopic terms for each token and synonym through `subtopicFieldType`. 
+   Subtopics are bound to the source token in the main query.
 
 ![image](./bmax_queryparsing.png)
 
-Query processing is done via Solr query `Analyzer`s configured in `FieldTypes` in your `schema.xml`. Die field types to use for query processing are part of the query parser configuration in your `solrconfig.xml`.
+Given the example above with `q=blue bike cheap` the query parsing field type would
+remove noise and leave the tokens `blue,bike`. The synonym lookup would retrieve `bicycle` as
+synonym for `bike`: `blue,[bike,bicycle]`. Subtopic retrieval for each token creates:
+`[blue,lavendel],[bike,bicycle,bmx,crossbike,roadbike]`.
 
-### 1. Parsing the user query
+The query constructed is always a `dismax` query with a minimum must match of `100%`. The
+example above would create the following query:
 
-The contents of the `q` parameter are stuffed into the query analyzer of the configured `queryParsingFieldType`. The configured tokenizer tokenizes the input string and the configured analyzer could be used to remove stopwords (see example below).
+    BooleanQuery(MUST) of
+      DismaxQuery(MUST) of blue,lavendel
+      DismaxQuery(MUST) of bike,bicycle,bmx,crossbike,roadbike
 
-### 2. Discovering synonyms (optional)
-
-Each token emitted from the `queryParsingFieldType`s query analyzer is placed in the `synonymFieldType` (if configured). Use the field's query analyzer to look up synonyms (see below). 
-
-### 3. Discovering boost and penalize terms (optional)
-
-The tokens emitted from the `queryParsingFieldType`s query analyzer are also put into the `boostUpFieldType` and the `boostDownFieldType` to discover boost terms. In contrast to synonyms, boost terms are not used to widen the search result, they are used to do a boosting or penalizing inside the result documents.
-
-### Building the query
-
-The tokens extracted from the configured field types are composed into a single lucene query. If we take the example above, the user query `blue pants cheap` is transformed into the tokens `blue` and `pants` (stopword *cheap* is removed). `pants` matches the synonym `jeans`, the boost up terms `denim` and `straight` and the penalize term `shoe`.
-
-The following lucene query will be constructed:
-
-* `BooleanQuery` (`MUST` match) of
-   * `DismaxQuery` of (`blue`)
-   * `DismaxQuery` of (`pants`, `jeans`)
-* `BooleanQuery` (`SHOULD` match) of
-   * `DismaxQuery` of (`denim`, `straight`)
-* `ReReankQuery` of (`shoe`) for the first 400 docs with a configurable negative weight.
+The boost query (if given) is appended.
 
 ## Installing the component
 
@@ -46,6 +82,7 @@ The following lucene query will be constructed:
   directory of your Solr installation. 
 * Configure at least one field type in your `schema.xml` that can be used for query parsing and tokenizing
 * Configure the `bmax` query parser in your `solrconfig.xml` (see below)
+* Configure the `bmax.booster` search component in your `solrconfig.xml` (see below)
 * Enable the `bmax` query parser using the `defType=bmax` parameter in your query.
 
 This project is also vailable from Maven Central:
@@ -53,9 +90,8 @@ This project is also vailable from Maven Central:
     <dependency>
         <groupId>com.s24.search.solr</groupId>
         <artifactId>solr-bmax-queryparser</artifactId>
-        <version>0.9.2</version>
+        <version>1.5.0</version>
         <classifier>jar-with-dependencies</classifier>
-        <scope>provided</scope>
     </dependency>
 
 
@@ -67,12 +103,36 @@ Add the `BmaxQParserPlugin` to the list of query parsers configured in your `sol
         <!-- use this field type's query analyzer to tokenize the query -->
         <str name="queryParsingFieldType">bmax_query</str>
 
-        <!-- further field types for synonyms and boostterms -->
+        <!-- further field types for synonyms and subtopics -->
         <str name="synonymFieldType">bmax_synonyms</str>
-        <str name="boostUpFieldType">bmax_boostterms</str>
-        <str name="boostDownFieldType">bmax_penalizeterms</str>
+        <str name="subtopicFieldType">bmax_subtopics</str>
     </queryParser>
- 
+
+Configure the boost term component as follows:
+
+    <searchComponent name="bmax.booster" class="com.s24.search.solr.component.BmaxBoostTermComponent">
+        <!-- use the same as in query parser -->
+        <str name="queryParsingFieldType">bmax_query</str>
+        <str name="synonymFieldType">bmax_synonyms</str>
+        
+        <!-- boost and penalize term retrieval -->
+        <str name="boostTermFieldType">bmax_boostterms</str>
+        <str name="penalizeTermFieldType">bmax_penalizeterms</str>
+    </searchComponent>
+    
+and add it to the components of your search handler in front of the query 
+component:
+
+    <requestHandler name="/select" class="solr.SearchHandler" default="true">
+     <arr name="components">
+         ...
+         <str>bmax.booster</str>
+         ...
+      </arr>
+    </requestHandler>
+
+## Configuring the fieldTypes needed
+
 A simple example for a field type in your `schema.xml`, that tokenizes a incoming query and removes stopwords might be this:
 
     <fieldType name="bmax_query" class="solr.TextField" indexed="false" stored="false">
@@ -106,35 +166,38 @@ This is a example of a synonym parser. The input is each token of the query anal
 For the boostterm field type, the `SynonymFilter` might be handy as well.
 
 ## Using the query parser
+Use the following url parameters to manipulate the boost component and query parser:
 
-The following url parameters are recognized:
+### Boost component params
+* `bmax.booster` (boolean) - enable/disable boost term component Default is `false`.
+* `bmax.booster.boost` (boolean) - enable/disable boost term resolution. Default is `true`.
+* `bmax.booster.penalize` (boolean) - enable/disable penalize term resolution. Default is `true`.
+* `bmax.booster.boost.factor` (float) - boost factor that is multiplied to the boosts given in the `qf` paramter. Default is `1.0`.
+* `bmax.booster.boost.extra` (String) - comma separated extra boost terms. Great to check new ideas.
+* `bmax.booster.penalize.factor` (float) - Penalize factor that is used as negative weight in the rerank query. Default is `100.0`.
+* `bmax.booster.penalize.docs` (int) - The number of documents to penalize from the begin of the result set.. Default is `400`.
+* `bmax.booster.penalize.extra` (String) - comma separated extra penalize terms. Great to check new ideas.
 
-* `q` (string) – the user query. *Lucene query syntax is not supported.* The input is passed into the tokenizer as is: `q=blue pants cheap`.
+### Query parser params
+The query params used reflect the Solr edismax query parser.
 
-* `qf` (string) – the query fields with their weights: `qf=title^10.0 description^2`.
+* `q` (string) – the user query. *Lucene query syntax is not supported.*
+* `qf` (string) – [the query fields with their weights](https://cwiki.apache.org/confluence/display/solr/The+DisMax+Query+Parser#TheDisMaxQueryParser).
+* `bq` (string) – [additive boost query](https://cwiki.apache.org/confluence/display/solr/The+DisMax+Query+Parser#TheDisMaxQueryParser) 
+* `bf` (string) – [additive boost functions](https://cwiki.apache.org/confluence/display/solr/The+DisMax+Query+Parser#TheDisMaxQueryParser)
+* `tie` (string) – [the dismax tie breaker](https://cwiki.apache.org/confluence/display/solr/The+DisMax+Query+Parser#TheDisMaxQueryParser). Default is `0.0`.
+* `boost` (string) – [multiplicative boost functions](https://cwiki.apache.org/confluence/display/solr/The+Extended+DisMax+Query+Parser)
+* `bmax.synonym.boost` (float) – The term boost to be multiplicated with the boost defined in the `qf` parameter for synonym terms. Default is `0.1`. 
+* `bmax.subtopic.boost`  (float) – The term boost to be multiplicated with the boost defined in the `qf` parameter for subtopic terms. Default is `0.01`. 
 
-* `bmax.boostDownTerm.enable` (boolean) – Enables penalize a.k.a boost down term lookup and application.
+### Experimental parser params
+This version leverages a experimental feature called term inspection. Before adding a term query clause to the main query or the boost query, the term inspection cache is checked, whether the term exists in the field term values.
 
-* `bmax.boostDownTerm.weight` (float) – The factor to apply the rerank query with, always negative. Defaults to `-2.0`
+* `bmax.inspect` (boolean) – Use the local term inspection cache to validate term query clauses. Default is `false`.
+* `bmax.inspect.build` (boolean) – Build a local term inspection cache using the given `qf`. Default is `false`
+* `bmax.inspect.maxterms` (integer) – Max numbers of distinct field terms to include a field in the term inspection cache. Default is `4096`. 
 
-* `bmax.boostDownTerm.extra` (string) - A comma separated list of extra penalize terms to apply. Use this for testing.
-
-* `bmax.boostUpTerm.enable` (boolean) – Enables boost up term lookup and application. 
-
-* `bmax.boostUpTerm.extra`(string) – A comma separated list of extra boost terms to apply. Use this for testing.
- 
-* `bmax.boostUpTerm.qf` (string) — if supplied, boost terms will be applied on these query fields and not on the query fields supplied in the `qf` parameter. Lucene field weights are supported. Defaults to values in the `qf` parameter.
-
-* `bmax.synonym.boost` (float) – When constructing the lucene queries, field weights are multiplicated with this synonym boost factor. Defaults to `0.01f`.
-
-* `bmax.synonym.extra` (string) – Supply extra synonyms in lucene synonym format, e.g. `shoe=>sneaker|clog,blue=>azure`. Use this for testing.
-
-Advanced users might like to experiment with some experimental features:
-
-* `bmax.manipulateDocumentFrequencies` (boolean, experimental) – Enables advanced manipulation of document frequencies. See [`BmaxLuceneQueryBuilder`](./src/main/java/com/s24/search/solr/query/bmax/BmaxLuceneQueryBuilder.java) for details. This will increase query parsing time by about factor 3! Defaults to `false`.
-
-* `bmax.manipulateTermFrequencies` (boolean, experimental) – Enables advanced manipulation of term frequencies. See [`BmaxLuceneQueryBuilder`](./src/main/java/com/s24/search/solr/query/bmax/BmaxLuceneQueryBuilder.java) for details. This will increase query parsing time by about factor 3! Defaults to `false`.
-
+In order to use the feature, create a custom Solr cache `bmax.fieldTermCache`. The cache entries will be saved as [Dictomaton FSTs](https://github.com/danieldk/dictomaton) in order to consume as less heap as possible.
 
 ## Building the project
 
