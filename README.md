@@ -60,7 +60,7 @@ is done in 3 steps:
 1. Retrieve subtopic terms for each token and synonym through `subtopicFieldType`. 
    Subtopics are bound to the source token in the main query.
 
-![image](./bmax_queryparsing.png)
+![image](./bmax_queryparser.png)
 
 Given the example above with `q=blue bike cheap` the query parsing field type would
 remove noise and leave the tokens `blue,bike`. The synonym lookup would retrieve `bicycle` as
