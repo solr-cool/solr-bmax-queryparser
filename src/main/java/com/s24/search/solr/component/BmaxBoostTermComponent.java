@@ -57,12 +57,16 @@ public class BmaxBoostTermComponent extends SearchComponent {
 
    // produces penalize terms
    private String penalizeTermFieldType;
+   
+   // parses query
+   private String queryParsingFieldType;
 
    @Override
    public void init(@SuppressWarnings("rawtypes") NamedList args) {
       super.init(args);
 
       SolrParams configuration = SolrParams.toSolrParams(args);
+      queryParsingFieldType = configuration.get("queryParsingFieldType");
       synonymFieldType = configuration.get("synonymFieldType");
       boostTermFieldType = configuration.get("boostTermFieldType");
       penalizeTermFieldType = configuration.get("penalizeTermFieldType");
@@ -103,6 +107,8 @@ public class BmaxBoostTermComponent extends SearchComponent {
       boolean synonyms = rb.req.getParams().getBool(SYNONYM_ENABLE, true);
 
       // collect analyzers
+      Analyzer queryParsingAnalyzer = rb.req.getSearcher().getSchema()
+            .getFieldTypeByName(queryParsingFieldType).getQueryAnalyzer();
       Analyzer synonymAnalyzer = rb.req.getSearcher().getSchema()
             .getFieldTypeByName(synonymFieldType).getQueryAnalyzer();
       Analyzer boostAnalyzer = rb.req.getSearcher().getSchema()
@@ -111,6 +117,9 @@ public class BmaxBoostTermComponent extends SearchComponent {
             .getFieldTypeByName(penalizeTermFieldType).getQueryAnalyzer();
       ModifiableSolrParams params = new ModifiableSolrParams(rb.req.getParams());
 
+      // do a first query parsing approach
+      q = Joiner.on(' ').skipNulls().join(Terms.collect(q, queryParsingAnalyzer));
+      
       // collect synonyms
       if (synonyms) {
          q += " " + Joiner.on(' ').skipNulls().join(Terms.collect(q, synonymAnalyzer));
