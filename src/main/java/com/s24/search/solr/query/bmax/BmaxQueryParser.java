@@ -115,7 +115,7 @@ public class BmaxQueryParser extends ExtendedDismaxQParser {
                Joiner.on(' ').join(Collections2.transform(query.getTerms(), BmaxQuery.toQueryTerm)));
          BmaxDebugInfo.add(rb, "bmax.synonyms",
                Joiner.on(' ').join(Iterables.concat(Iterables.transform(query.getTerms(), BmaxQuery.toSynonyms))));
-         BmaxDebugInfo.add(rb, "bmax.subtocpics",
+         BmaxDebugInfo.add(rb, "bmax.subtopics",
                Joiner.on(' ').join(Iterables.concat(Iterables.transform(query.getTerms(), BmaxQuery.toSubtopics))));
          BmaxDebugInfo.add(rb, "bmax.queryClauseCount", String.valueOf(queryBuilder.getQueryClauseCount()));
       }
