@@ -85,7 +85,7 @@ public class BmaxQuery {
    public void setBuildTermsInspectionCache(boolean buildTermsInspectionCache) {
       this.buildTermsInspectionCache = buildTermsInspectionCache;
    }
-
+   
    public static final Function<BmaxTerm, CharSequence> toQueryTerm = new Function<BmaxQuery.BmaxTerm, CharSequence>() {
       @Override
       public CharSequence apply(BmaxTerm bt) {

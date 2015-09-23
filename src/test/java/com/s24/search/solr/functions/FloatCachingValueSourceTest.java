@@ -9,7 +9,7 @@ import static org.mockito.Mockito.when;
 
 import java.util.Map;
 
-import org.apache.lucene.index.AtomicReaderContext;
+import org.apache.lucene.index.LeafReaderContext;
 import org.apache.lucene.queries.function.FunctionValues;
 import org.apache.lucene.queries.function.ValueSource;
 import org.junit.Before;
@@ -32,7 +32,7 @@ public class FloatCachingValueSourceTest {
    @Before
    public void setUp() throws Exception {
       MockitoAnnotations.initMocks(this);
-      when(mockSource.getValues(any(Map.class), any(AtomicReaderContext.class))).thenReturn(mockValues);
+      when(mockSource.getValues(any(Map.class), any(LeafReaderContext.class))).thenReturn(mockValues);
       valueSource = new FloatCachingValueSource(mockSource, MAX_DOC, FloatCachingValueSource.CACHE_FAST);
    }
 

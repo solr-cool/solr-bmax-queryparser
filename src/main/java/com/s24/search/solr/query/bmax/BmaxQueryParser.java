@@ -6,9 +6,9 @@ import java.util.Locale;
 import java.util.Map.Entry;
 
 import org.apache.lucene.analysis.Analyzer;
+import org.apache.lucene.index.DocValues;
 import org.apache.lucene.index.SortedDocValues;
 import org.apache.lucene.index.TermsEnum;
-import org.apache.lucene.search.FieldCache;
 import org.apache.lucene.search.Query;
 import org.apache.solr.common.params.DisMaxParams;
 import org.apache.solr.common.params.SolrParams;
@@ -54,8 +54,7 @@ public class BmaxQueryParser extends ExtendedDismaxQParser {
     * @param queryParsingAnalyzer
     *           the analyzer to parse the query with.
     * @param synonymAnalyzer
-    *           the analyzer to parse synonyms out of the outcome of the
-    *           <code>queryParsingAnalyzer</code>
+    *           the analyzer to parse synonyms out of the outcome of the <code>queryParsingAnalyzer</code>
     * @param subtopicAnalyzer
     * @param boostUpAnalyzer
     * @param boostDownAnalyzer
@@ -136,8 +135,7 @@ public class BmaxQueryParser extends ExtendedDismaxQParser {
 
             // check the number of terms for the field. If below the configured
             // threshold, build a dictomaton lookup
-            SortedDocValues values = FieldCache.DEFAULT.getTermsIndex(getReq().getSearcher().getAtomicReader(),
-                  field.getKey());
+            SortedDocValues values = DocValues.getSorted(getReq().getSearcher().getLeafReader(), field.getKey());
 
             // inspect and precache terms
             if (values.getValueCount() < query.getMaxInspectTerms()) {

@@ -82,7 +82,7 @@ public class Terms {
             // Needs to converted to a deep copy of byte ref, because on
             // tokenStream.end()
             // the termAttribute will be flushed.
-            termAttribute.fillBytesRef();
+            termAttribute.getBytesRef();
             result.add(new Term(field, BytesRef.deepCopyOf(termAttribute.getBytesRef())));
          }
       } catch (IOException e) {

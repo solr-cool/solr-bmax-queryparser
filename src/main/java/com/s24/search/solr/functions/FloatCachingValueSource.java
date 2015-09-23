@@ -6,7 +6,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
 import java.io.IOException;
 import java.util.Map;
 
-import org.apache.lucene.index.AtomicReaderContext;
+import org.apache.lucene.index.LeafReaderContext;
 import org.apache.lucene.queries.function.FunctionValues;
 import org.apache.lucene.queries.function.ValueSource;
 import org.apache.lucene.queries.function.docvalues.FloatDocValues;
@@ -74,12 +74,12 @@ public class FloatCachingValueSource extends ValueSource {
     * Checks whether this atomic reader context is valid. Cache for valid reader
     * contexts only.
     */
-   private boolean isValidAtomicReaderContext(AtomicReaderContext readerContext) {
+   private boolean isValidAtomicReaderContext(LeafReaderContext readerContext) {
       return readerContext != null && readerContext.docBase > 0;
    }
 
    @Override
-   public FunctionValues getValues(@SuppressWarnings("rawtypes") Map context, final AtomicReaderContext readerContext)
+   public FunctionValues getValues(@SuppressWarnings("rawtypes") Map context, final LeafReaderContext readerContext)
          throws IOException {
       final FunctionValues sourceValues = source.getValues(context, readerContext);
 
