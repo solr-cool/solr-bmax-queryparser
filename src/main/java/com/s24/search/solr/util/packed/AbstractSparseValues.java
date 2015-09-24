@@ -2,7 +2,7 @@ package com.s24.search.solr.util.packed;
 
 import static com.google.common.base.Preconditions.checkArgument;
 
-import org.apache.lucene.util.OpenBitSet;
+import org.apache.lucene.util.FixedBitSet;
 import org.apache.lucene.util.RamUsageEstimator;
 
 import com.s24.search.solr.util.LongValueCache;
@@ -24,7 +24,7 @@ public abstract class AbstractSparseValues implements LongValueCache {
       checkArgument(maxValueCount > 0, "Pre-condition violated: expression maxValueCount > 0 must be true.");
 
       // compute number of words
-      int wordCount = OpenBitSet.bits2words(maxValueCount);
+      int wordCount = FixedBitSet.bits2words(maxValueCount);
 
       this.words = new long[wordCount];
       this.values = new LongValueCache[wordCount];
@@ -129,5 +129,5 @@ public abstract class AbstractSparseValues implements LongValueCache {
 
       return Long.MAX_VALUE;
    }
-
+   
 }

@@ -3,7 +3,10 @@ package com.s24.search.solr.util;
 import static com.google.common.base.Preconditions.checkArgument;
 
 import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
 
+import org.apache.lucene.util.Accountable;
 import org.apache.lucene.util.RamUsageEstimator;
 
 /**
@@ -66,6 +69,11 @@ public class FloatArrayValueCache implements FloatValueCache {
    @Override
    public int size() {
       return cache.length;
+   }
+
+   @Override
+   public Collection<Accountable> getChildResources() {
+      return Collections.emptyList();
    }
 
 }

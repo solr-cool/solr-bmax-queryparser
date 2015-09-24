@@ -3,7 +3,10 @@ package com.s24.search.solr.util;
 import static com.google.common.base.Preconditions.checkArgument;
 
 import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
 
+import org.apache.lucene.util.Accountable;
 import org.apache.lucene.util.RamUsageEstimator;
 
 public class LongArrayValueCache implements LongValueCache {
@@ -69,6 +72,11 @@ public class LongArrayValueCache implements LongValueCache {
             "Pre-condition violated: expression index >=0 && index < cache.length  must be true.");
       
       return cache[index] < Long.MAX_VALUE;
+   }
+
+   @Override
+   public Collection<Accountable> getChildResources() {
+      return Collections.emptyList();
    }
 
 }

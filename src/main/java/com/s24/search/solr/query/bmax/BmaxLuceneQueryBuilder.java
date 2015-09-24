@@ -12,7 +12,7 @@ import org.apache.lucene.queries.function.ValueSource;
 import org.apache.lucene.queries.function.valuesource.ProductFloatFunction;
 import org.apache.lucene.search.BooleanClause;
 import org.apache.lucene.search.BooleanClause.Occur;
-import org.apache.lucene.search.BooleanQuery;
+import org.apache.lucene.search.BooleanQuery.Builder;
 import org.apache.lucene.search.DisjunctionMaxQuery;
 import org.apache.lucene.search.MatchAllDocsQuery;
 import org.apache.lucene.search.Query;
@@ -113,8 +113,9 @@ public class BmaxLuceneQueryBuilder {
       if (bmaxquery.getTerms().isEmpty()) {
          return new MatchAllDocsQuery();
       }
-
-      BooleanQuery bq = new BooleanQuery(true);
+      
+      Builder bq = new Builder();
+      bq.setDisableCoord(true);
 
       // iterate terms
       for (BmaxTerm term : bmaxquery.getTerms()) {
@@ -138,7 +139,7 @@ public class BmaxLuceneQueryBuilder {
       }
 
       // done
-      return bq;
+      return bq.build();
    }
 
    // ---- main query
