@@ -4,6 +4,8 @@ import static com.google.common.base.Preconditions.checkNotNull;
 
 import java.io.IOException;
 import java.util.Collection;
+import java.util.HashSet;
+import java.util.Set;
 
 import org.apache.commons.io.input.CharSequenceReader;
 import org.apache.lucene.analysis.Analyzer;
@@ -20,25 +22,23 @@ import com.google.common.collect.Lists;
 
 /**
  * Utility methods that yet cannot be found in {@linkplain SolrPluginUtils}
- * 
+ *
  * @author Shopping24 GmbH, Torsten Bøgh Köster (@tboeghk)
  */
 public class Terms {
 
    /**
     * Analyzes the given string using the given {@link Analyzer} (-chain).
-    * 
-    * @param input
-    *           Input string.
-    * @param analyzer
-    *           Analyzer.
+    *
+    * @param input    Input string.
+    * @param analyzer Analyzer.
     * @return All terms from the resulting token stream.
     */
-   public static Collection<CharSequence> collect(CharSequence input, Analyzer analyzer) {
+   public static Set<CharSequence> collect(CharSequence input, Analyzer analyzer) {
       checkNotNull(input, "Pre-condition violated: input must not be null.");
       checkNotNull(analyzer, "Pre-condition violated: analyzer must not be null.");
 
-      Collection<CharSequence> result = Lists.newArrayList();
+      Set<CharSequence> result = new HashSet<>();
       TokenStream tokenStream = null;
       try {
          tokenStream = analyzer.tokenStream("bmax", new CharSequenceReader(input));
@@ -48,7 +48,7 @@ public class Terms {
          while (tokenStream.incrementToken()) {
             // Needs to converted to string, because on tokenStream.end()
             // the charTermAttribute will be flushed.
-            result.add((CharSequence) ((AttributeImpl) charTermAttribute).clone());
+            result.add(charTermAttribute.toString());
          }
 
       } catch (IOException e) {
