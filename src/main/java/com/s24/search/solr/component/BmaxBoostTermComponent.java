@@ -47,6 +47,7 @@ public class BmaxBoostTermComponent extends SearchComponent {
    private static final String BOOST_EXTRA_TERMS = COMPONENT_NAME + ".boost.extra";
    private static final String BOOST_ENABLE = COMPONENT_NAME + ".boost";
    private static final String BOOST_FACTOR = COMPONENT_NAME + ".boost.factor";
+   private static final String BOOST_FIELDS = COMPONENT_NAME + ".boost.qf";
    private static final String SYNONYM_ENABLE = COMPONENT_NAME + ".synonyms";
 
    // (optional) synonym field
@@ -137,7 +138,7 @@ public class BmaxBoostTermComponent extends SearchComponent {
          // add boosts
          if (!terms.isEmpty()) {
             params.add("bq", String.format(Locale.US, "{!dismax qf='%s' mm=1 bq=''} %s",
-                  computeFactorizedQueryFields(rb.req, boostFactor),
+                  rb.req.getParams().get(BOOST_FIELDS, computeFactorizedQueryFields(rb.req, boostFactor)),
                   Joiner.on(' ').join(terms)));
 
             // add debug
