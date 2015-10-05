@@ -23,7 +23,9 @@ public class BmaxQuery {
    private final Map<String, Float> fieldsAndBoosts = Maps.newHashMap();
 
    // boost for synonyms
+   private boolean synonymEnabled = true;
    private float synonymBoost = 0.1f;
+   private boolean subtopicEnabled = true;
    private float subtopicBoost = 0.01f;
    private float tieBreakerMultiplier = 0.0f;
    private boolean inspectTerms = false;
@@ -34,12 +36,28 @@ public class BmaxQuery {
       return fieldsAndBoosts;
    }
 
+   public boolean isSynonymEnabled() {
+      return synonymEnabled;
+   }
+
+   public void setSynonymEnabled(boolean synonymEnabled) {
+      this.synonymEnabled = synonymEnabled;
+   }
+
    public float getSynonymBoost() {
       return synonymBoost;
    }
 
    public void setSynonymBoost(float synonymBoost) {
       this.synonymBoost = synonymBoost;
+   }
+
+   public boolean isSubtopicEnabled() {
+      return subtopicEnabled;
+   }
+
+   public void setSubtopicEnabled(boolean subtopicEnabled) {
+      this.subtopicEnabled = subtopicEnabled;
    }
 
    public float getSubtopicBoost() {

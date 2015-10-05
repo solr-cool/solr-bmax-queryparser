@@ -32,7 +32,9 @@ import eu.danieldk.dictomaton.DictionaryBuilder;
 
 public class BmaxQueryParser extends ExtendedDismaxQParser {
 
+   public static final String PARAM_SYNONYM_ENABLE = "bmax.synonym";
    public static final String PARAM_SYNONYM_BOOST = "bmax.synonym.boost";
+   public static final String PARAM_SUBTOPIC_ENABLE = "bmax.subtopic";
    public static final String PARAM_SUBTOPIC_BOOST = "bmax.subtopic.boost";
    public static final String PARAM_TIE = DisMaxParams.TIE;
    public static final String PARAM_INSPECT_TERMS = "bmax.inspect";
@@ -161,7 +163,9 @@ public class BmaxQueryParser extends ExtendedDismaxQParser {
       BmaxQuery query = new BmaxQuery();
 
       // get parameters
+      query.setSynonymEnabled(getReq().getParams().getBool(PARAM_SYNONYM_ENABLE, true));
       query.setSynonymBoost(getReq().getParams().getFloat(PARAM_SYNONYM_BOOST, 0.1f));
+      query.setSubtopicEnabled(getReq().getParams().getBool(PARAM_SUBTOPIC_ENABLE, true));
       query.setSubtopicBoost(getReq().getParams().getFloat(PARAM_SUBTOPIC_BOOST, 0.01f));
       query.setTieBreakerMultiplier(getReq().getParams().getFloat(PARAM_TIE, 0.00f));
       query.setInspectTerms(getReq().getParams().getBool(PARAM_INSPECT_TERMS, false));
@@ -188,7 +192,7 @@ public class BmaxQueryParser extends ExtendedDismaxQParser {
                BmaxTerm bt = new BmaxTerm(term);
 
                // add synonyms and extra synonyms
-               if (synonymAnalyzer != null) {
+               if (query.isSynonymEnabled() && synonymAnalyzer != null) {
                   bt.getSynonyms().addAll(Collections2.filter(
                         Terms.collect(term, synonymAnalyzer),
                         Predicates.not(new Predicate<CharSequence>() {
@@ -200,7 +204,7 @@ public class BmaxQueryParser extends ExtendedDismaxQParser {
                }
 
                // add subtopics.
-               if (subtopicAnalyzer != null) {
+               if (query.isSubtopicEnabled() && subtopicAnalyzer != null) {
                   bt.getSubtopics().addAll(Terms.collect(term, subtopicAnalyzer));
 
                   // run synonyms through subtopics as well
