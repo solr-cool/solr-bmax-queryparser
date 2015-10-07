@@ -8,16 +8,16 @@ public class BmaxTermCacheEntry {
 
    private final Dictionary terms;
    private final int termCount;
-   private final boolean cache;
+   private final boolean hasTerms;
 
    public BmaxTermCacheEntry(int termCount) {
       this(null, termCount, false);
    }
 
-   public BmaxTermCacheEntry(Dictionary terms, int termCount, boolean cache) {
+   public BmaxTermCacheEntry(Dictionary terms, int termCount, boolean hasTerms) {
       this.terms = terms;
       this.termCount = termCount;
-      this.cache = cache;
+      this.hasTerms = hasTerms;
    }
 
    public Dictionary getTerms() {
@@ -28,14 +28,17 @@ public class BmaxTermCacheEntry {
       return termCount;
    }
 
-   public boolean isCache() {
-      return cache;
+   /**
+    * Returns true if this entry contains the cached terms, false otherwise.
+    */
+   public boolean hasTerms() {
+      return hasTerms;
    }
    
    @Override
    public String toString() {
       return Objects.toStringHelper(this)
-            .add("cache", cache)
+            .add("hasTerms", hasTerms)
             .add("termCount", termCount)
             .toString();
    }

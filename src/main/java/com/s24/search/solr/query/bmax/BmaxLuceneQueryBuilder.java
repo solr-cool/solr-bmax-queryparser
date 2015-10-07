@@ -211,9 +211,9 @@ public class BmaxLuceneQueryBuilder {
          }
 
          // add if dictionary is missing or field should not be cached
-         if (cache == null || !cache.isCache()) {
+         if (cache == null || !cache.hasTerms()) {
             queries.add(buildTermQuery(term, bmaxquery.getFieldsAndBoosts().get(field) * extraBoost));
-         } else if (cache != null && cache.isCache() && cache.getTerms().contains(term.text())) {
+         } else if (cache != null && cache.hasTerms() && cache.getTerms().contains(term.text())) {
 
             // if field terms are cached, add term query only if necessary
             queries.add(buildTermQuery(term, bmaxquery.getFieldsAndBoosts().get(field) * extraBoost));
