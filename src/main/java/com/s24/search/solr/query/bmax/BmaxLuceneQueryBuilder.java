@@ -25,7 +25,7 @@ import com.s24.search.solr.query.bmax.BmaxQuery.BmaxTerm;
 
 /**
  * Builds the bmax dismax query
- * 
+ *
  * @author Shopping24 GmbH, Torsten Bøgh Köster (@tboeghk)
  */
 public class BmaxLuceneQueryBuilder {
@@ -37,7 +37,7 @@ public class BmaxLuceneQueryBuilder {
    private List<Query> boostQueries;
    private List<Query> additiveBoostFunctions;
    private IndexSchema schema;
-   private SolrCache<String, BmaxTermCacheEntry> fieldTermCache;
+   private SolrCache<String, FieldTermsDictionary> fieldTermCache;
    private int queryClauseCount = 0;
 
    public BmaxLuceneQueryBuilder(BmaxQuery bmaxQuery) {
@@ -50,7 +50,7 @@ public class BmaxLuceneQueryBuilder {
       return queryClauseCount;
    }
 
-   public BmaxLuceneQueryBuilder withFieldTermCache(SolrCache<String, BmaxTermCacheEntry> fieldTermCache) {
+   public BmaxLuceneQueryBuilder withFieldTermCache(SolrCache<String, FieldTermsDictionary> fieldTermCache) {
       this.fieldTermCache = fieldTermCache;
       return this;
    }
@@ -113,7 +113,7 @@ public class BmaxLuceneQueryBuilder {
       if (bmaxquery.getTerms().isEmpty()) {
          return new MatchAllDocsQuery();
       }
-      
+
       Builder bq = new Builder();
       bq.setDisableCoord(true);
 
@@ -201,21 +201,17 @@ public class BmaxLuceneQueryBuilder {
       Collection<Query> queries = Sets.newHashSet();
 
       for (Term term : terms) {
-         BmaxTermCacheEntry cache = null;
+         FieldTermsDictionary fieldTerms = null;
 
          // check for term inspection && available term cache
          if (bmaxquery.isInspectTerms() && fieldTermCache != null) {
 
             // or on activated term inspection
-            cache = fieldTermCache.get(field);
+            fieldTerms = fieldTermCache.get(field);
          }
 
-         // add if dictionary is missing or field should not be cached
-         if (cache == null || !cache.hasTerms()) {
-            queries.add(buildTermQuery(term, bmaxquery.getFieldsAndBoosts().get(field) * extraBoost));
-         } else if (cache != null && cache.hasTerms() && cache.getTerms().contains(term.text())) {
-
-            // if field terms are cached, add term query only if necessary
+         // Add the term to the query if we don't have a cache, or if the cache says that the field may contain the term
+         if (fieldTerms == null || fieldTerms.fieldMayContainTerm(term.text())) {
             queries.add(buildTermQuery(term, bmaxquery.getFieldsAndBoosts().get(field) * extraBoost));
          }
       }

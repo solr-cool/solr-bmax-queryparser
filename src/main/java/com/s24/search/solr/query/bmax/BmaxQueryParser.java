@@ -46,7 +46,7 @@ public class BmaxQueryParser extends ExtendedDismaxQParser {
    private final Analyzer synonymAnalyzer;
    private final Analyzer subtopicAnalyzer;
    private final Analyzer queryParsingAnalyzer;
-   private final SolrCache<String, BmaxTermCacheEntry> fieldTermCache;
+   private final SolrCache<String, FieldTermsDictionary> fieldTermCache;
 
    /**
     * Creates a new {@linkplain BmaxQueryParser}.
@@ -63,7 +63,7 @@ public class BmaxQueryParser extends ExtendedDismaxQParser {
     */
    public BmaxQueryParser(String qstr, SolrParams localParams, SolrParams params, SolrQueryRequest req,
          Analyzer queryParsingAnalyzer, Analyzer synonymAnalyzer, Analyzer subtopicAnalyzer,
-         SolrCache<String, BmaxTermCacheEntry> fieldTermCache) {
+         SolrCache<String, FieldTermsDictionary> fieldTermCache) {
       super(qstr, localParams, params, req);
 
       // mandatory
@@ -132,7 +132,7 @@ public class BmaxQueryParser extends ExtendedDismaxQParser {
       for (Entry<String, Float> field : query.getFieldsAndBoosts().entrySet()) {
 
          // fill on cache miss
-         BmaxTermCacheEntry cache = fieldTermCache.get(field.getKey());
+         FieldTermsDictionary cache = fieldTermCache.get(field.getKey());
          if (cache == null) {
 
             // check the number of terms for the field. If below the configured
@@ -151,9 +151,9 @@ public class BmaxQueryParser extends ExtendedDismaxQParser {
 
                // add computed dictionary
                fieldTermCache
-                     .put(field.getKey(), new BmaxTermCacheEntry(builder.build(), values.getValueCount(), true));
+                     .put(field.getKey(), new FieldTermsDictionary(builder.build()));
             } else {
-               fieldTermCache.put(field.getKey(), new BmaxTermCacheEntry(values.getValueCount()));
+               fieldTermCache.put(field.getKey(), new FieldTermsDictionary());
             }
          }
       }
