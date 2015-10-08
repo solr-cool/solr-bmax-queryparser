@@ -142,7 +142,9 @@ public class BmaxBoostTermComponent extends SearchComponent {
                   Joiner.on(' ').join(terms)));
 
             // add debug
-            BmaxDebugInfo.add(rb, COMPONENT_NAME + ".boost.terms", Joiner.on(' ').join(terms));
+            if (rb.isDebugQuery()) {
+               BmaxDebugInfo.add(rb, COMPONENT_NAME + ".boost.terms", Joiner.on(' ').join(terms));
+            }
          }
       }
 
@@ -182,7 +184,9 @@ public class BmaxBoostTermComponent extends SearchComponent {
             params.add("rqq", rerank.toString());
 
             // add debug
-            BmaxDebugInfo.add(rb, COMPONENT_NAME + ".penalize.terms", Joiner.on(' ').join(terms));
+            if (rb.isDebugQuery()) {
+               BmaxDebugInfo.add(rb, COMPONENT_NAME + ".penalize.terms", Joiner.on(' ').join(terms));
+            }
          }
       }
 

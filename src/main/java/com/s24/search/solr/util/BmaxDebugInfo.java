@@ -7,7 +7,7 @@ import org.apache.solr.handler.component.ResponseBuilder;
 
 /**
  * Utility class for debugging
- * 
+ *
  * @author Shopping24 GmbH, Torsten Bøgh Köster (@tboeghk)
  */
 public class BmaxDebugInfo {
@@ -17,7 +17,7 @@ public class BmaxDebugInfo {
 
    /**
     * Add debug info to the response. Values with the same key will be concatenated.
-    * 
+    *
     * @param rb
     *           Where the debug info will be attached.
     * @param key
@@ -30,19 +30,17 @@ public class BmaxDebugInfo {
       checkNotNull(key, "Pre-condition violated: key must not be null.");
       checkNotNull(value, "Pre-condition violated: value must not be null.");
 
-      if (rb.isDebug()) {
-         String debugKey = key.replace('.', '_');
-         String debugValue = value;
-         NamedList<Object> debugInfo = rb.getDebugInfo();
-         if (debugInfo != null) {
-            Object previousValue = debugInfo.remove(debugKey);
-            if (previousValue != null) {
-               // just add the new value if its valid (not empty and no duplicate)
-               debugValue = !((String) previousValue).contains(value) && value.length() > 0
-                     ? (String) previousValue + "; " + value : (String) previousValue;
-            }
+      String debugKey = key.replace('.', '_');
+      String debugValue = value;
+      NamedList<Object> debugInfo = rb.getDebugInfo();
+      if (debugInfo != null) {
+         Object previousValue = debugInfo.remove(debugKey);
+         if (previousValue != null) {
+            // just add the new value if its valid (not empty and no duplicate)
+            debugValue = !((String) previousValue).contains(value) && value.length() > 0
+                  ? (String) previousValue + "; " + value : (String) previousValue;
          }
-         rb.addDebugInfo(debugKey, debugValue);
       }
+      rb.addDebugInfo(debugKey, debugValue);
    }
 }

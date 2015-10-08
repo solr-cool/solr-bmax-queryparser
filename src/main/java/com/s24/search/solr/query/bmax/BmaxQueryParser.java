@@ -8,6 +8,7 @@ import java.util.Map.Entry;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.index.TermsEnum;
 import org.apache.lucene.search.Query;
+import org.apache.solr.common.params.CommonParams;
 import org.apache.solr.common.params.DisMaxParams;
 import org.apache.solr.common.params.SolrParams;
 import org.apache.solr.handler.component.ResponseBuilder;
@@ -49,22 +50,23 @@ public class BmaxQueryParser extends ExtendedDismaxQParser {
    private final Analyzer subtopicAnalyzer;
    private final Analyzer queryParsingAnalyzer;
    private final SolrCache<String, FieldTermsDictionary> fieldTermCache;
+   private final SolrParams params;
+   private final boolean debugQuery;
 
    /**
     * Creates a new {@linkplain BmaxQueryParser}.
-    * 
-    * @param qstr
-    *           the original input query string
-    * @param queryParsingAnalyzer
-    *           the analyzer to parse the query with.
-    * @param synonymAnalyzer
-    *           the analyzer to parse synonyms out of the outcome of the <code>queryParsingAnalyzer</code>
+    *
+    * @param qstr                 the original input query string
+    * @param queryParsingAnalyzer the analyzer to parse the query with.
+    * @param synonymAnalyzer      the analyzer to parse synonyms out of the outcome of the <code>queryParsingAnalyzer</code>
     * @param subtopicAnalyzer
     */
    public BmaxQueryParser(String qstr, SolrParams localParams, SolrParams params, SolrQueryRequest req,
          Analyzer queryParsingAnalyzer, Analyzer synonymAnalyzer, Analyzer subtopicAnalyzer,
          SolrCache<String, FieldTermsDictionary> fieldTermCache) {
       super(qstr, localParams, params, req);
+      this.params = SolrParams.wrapDefaults(localParams, params);
+      this.debugQuery = isDebugQuery();
 
       // mandatory
       checkNotNull(queryParsingAnalyzer, "Pre-condition violated: queryParsingAnalyzer must not be null.");
@@ -74,6 +76,31 @@ public class BmaxQueryParser extends ExtendedDismaxQParser {
       this.synonymAnalyzer = synonymAnalyzer;
       this.subtopicAnalyzer = subtopicAnalyzer;
       this.fieldTermCache = fieldTermCache;
+   }
+
+   /**
+    * Returns true if query information should be included in the debug output.
+    */
+   private boolean isDebugQuery() {
+      // debugQuery=true is a legacy alternative for debug=all
+      if (params.getBool(CommonParams.DEBUG_QUERY, false)) {
+         return true;
+      }
+
+      // This code is adapted from SolrPluginUtils#getDebugInterests, but that code requires a ResponseBuilder to write
+      // its result into.
+      String[] debugParams = params.getParams(CommonParams.DEBUG);
+      if (debugParams != null) {
+         for (int i = 0; i < debugParams.length; i++) {
+            if (debugParams[i].equalsIgnoreCase("all")
+                  || debugParams[i].equalsIgnoreCase("true")
+                  || debugParams[i].equalsIgnoreCase("query")) {
+               return true;
+            }
+         }
+      }
+
+      return false;
    }
 
    @Override
@@ -97,7 +124,7 @@ public class BmaxQueryParser extends ExtendedDismaxQParser {
             .build();
 
       // save debug stuff
-      if (SolrRequestInfo.getRequestInfo() != null) {
+      if (SolrRequestInfo.getRequestInfo() != null && debugQuery) {
          ResponseBuilder rb = SolrRequestInfo.getRequestInfo().getResponseBuilder();
 
          BmaxDebugInfo.add(rb, "bmax.query",
@@ -144,7 +171,7 @@ public class BmaxQueryParser extends ExtendedDismaxQParser {
             }
          }
 
-         if (SolrRequestInfo.getRequestInfo() != null) {
+         if (SolrRequestInfo.getRequestInfo() != null && debugQuery) {
             ResponseBuilder rb = SolrRequestInfo.getRequestInfo().getResponseBuilder();
             BmaxDebugInfo.add(rb, "bmax.inspect", String.format(Locale.US, "Built term inspection cache in %sms",
                   (System.currentTimeMillis() - start)));
@@ -158,19 +185,19 @@ public class BmaxQueryParser extends ExtendedDismaxQParser {
       BmaxQuery query = new BmaxQuery();
 
       // get parameters
-      query.setSynonymEnabled(getReq().getParams().getBool(PARAM_SYNONYM_ENABLE, true));
-      query.setSynonymBoost(getReq().getParams().getFloat(PARAM_SYNONYM_BOOST, 0.1f));
-      query.setSubtopicEnabled(getReq().getParams().getBool(PARAM_SUBTOPIC_ENABLE, true));
-      query.setSubtopicBoost(getReq().getParams().getFloat(PARAM_SUBTOPIC_BOOST, 0.01f));
-      query.setTieBreakerMultiplier(getReq().getParams().getFloat(PARAM_TIE, 0.00f));
-      query.setInspectTerms(getReq().getParams().getBool(PARAM_INSPECT_TERMS, false));
-      query.setMaxInspectTerms(getReq().getParams().getInt(PARAM_INSPECT_MAX_TERMS, 1024 * 8));
-      query.setBuildTermsInspectionCache(getReq().getParams().getBool(PARAM_BUILD_INSPECT_TERMS, false));
+      query.setSynonymEnabled(params.getBool(PARAM_SYNONYM_ENABLE, true));
+      query.setSynonymBoost(params.getFloat(PARAM_SYNONYM_BOOST, 0.1f));
+      query.setSubtopicEnabled(params.getBool(PARAM_SUBTOPIC_ENABLE, true));
+      query.setSubtopicBoost(params.getFloat(PARAM_SUBTOPIC_BOOST, 0.01f));
+      query.setTieBreakerMultiplier(params.getFloat(PARAM_TIE, 0.00f));
+      query.setInspectTerms(params.getBool(PARAM_INSPECT_TERMS, false));
+      query.setMaxInspectTerms(params.getInt(PARAM_INSPECT_MAX_TERMS, 1024 * 8));
+      query.setBuildTermsInspectionCache(params.getBool(PARAM_BUILD_INSPECT_TERMS, false));
 
       try {
          // extract fields and boost
          query.getFieldsAndBoosts().putAll(
-               SolrPluginUtils.parseFieldBoosts(getReq().getParams().getParams(DisMaxParams.QF)));
+               SolrPluginUtils.parseFieldBoosts(params.getParams(DisMaxParams.QF)));
 
          // set default field boost for the unboosted ones
          for (String fieldname : query.getFieldsAndBoosts().keySet()) {
