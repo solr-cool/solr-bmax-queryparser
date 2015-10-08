@@ -151,7 +151,7 @@ public class BmaxLuceneQueryBuilder {
    protected Query buildDismaxQuery(BmaxTerm term) {
       checkNotNull(term, "Pre-condition violated: term must not be null.");
 
-      DisjunctionMaxQuery dmq = new DisjunctionMaxQuery(bmaxquery.getTieBreakerMultiplier());
+      DisjunctionMaxQuery dismaxQuery = new DisjunctionMaxQuery(bmaxquery.getTieBreakerMultiplier());
 
       // iterate fields and build concrete queries
       for (String field : bmaxquery.getFieldsAndBoosts().keySet()) {
@@ -160,7 +160,7 @@ public class BmaxLuceneQueryBuilder {
          Analyzer analyzer = schema.getField(field).getType().getQueryAnalyzer();
 
          // add main term clause
-         dmq.add(
+         dismaxQuery.add(
                buildTermQueries(field,
                      Terms.collectTerms(term.getTerm(), analyzer, field),
                      USER_QUERY_FIELD_BOOST));
@@ -168,7 +168,7 @@ public class BmaxLuceneQueryBuilder {
          // add synonym clause
          if (!term.getSynonyms().isEmpty()) {
             for (CharSequence synonym : term.getSynonyms()) {
-               dmq.add(
+               dismaxQuery.add(
                      buildTermQueries(field,
                            Terms.collectTerms(synonym, analyzer, field),
                            bmaxquery.getSynonymBoost()));
@@ -178,7 +178,7 @@ public class BmaxLuceneQueryBuilder {
          // add subtopic clause
          if (!term.getSubtopics().isEmpty()) {
             for (CharSequence subtopic : term.getSubtopics()) {
-               dmq.add(
+               dismaxQuery.add(
                      buildTermQueries(field,
                            Terms.collectTerms(subtopic, analyzer, field),
                            bmaxquery.getSubtopicBoost()));
@@ -186,7 +186,7 @@ public class BmaxLuceneQueryBuilder {
          }
       }
 
-      return dmq;
+      return dismaxQuery;
    }
 
    // ---- term queries

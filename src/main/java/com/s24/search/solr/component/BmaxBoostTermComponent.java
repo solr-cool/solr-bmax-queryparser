@@ -32,7 +32,7 @@ import com.s24.search.solr.util.BmaxDebugInfo;
  * <code>bq</code> boost query parameter that can be picked up by the bmax
  * and/or edismax query parser. Penalize terms are filled into a rerank query
  * that will be executed by the {@linkplain ReRankQParserPlugin}.
- * 
+ *
  * @author Shopping24 GmbH, Torsten Bøgh Köster (@tboeghk)
  */
 public class BmaxBoostTermComponent extends SearchComponent {
@@ -58,7 +58,7 @@ public class BmaxBoostTermComponent extends SearchComponent {
 
    // produces penalize terms
    private String penalizeTermFieldType;
-   
+
    // parses query
    private String queryParsingFieldType;
 
@@ -120,7 +120,7 @@ public class BmaxBoostTermComponent extends SearchComponent {
 
       // do a first query parsing approach
       q = Joiner.on(' ').skipNulls().join(Terms.collect(q, queryParsingAnalyzer));
-      
+
       // collect synonyms
       if (synonyms) {
          q += " " + Joiner.on(' ').skipNulls().join(Terms.collect(q, synonymAnalyzer));
