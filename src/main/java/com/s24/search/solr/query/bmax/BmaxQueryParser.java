@@ -8,6 +8,7 @@ import java.util.Map.Entry;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.index.DocValues;
 import org.apache.lucene.index.SortedDocValues;
+import org.apache.lucene.index.SortedSetDocValues;
 import org.apache.lucene.index.TermsEnum;
 import org.apache.lucene.search.Query;
 import org.apache.solr.common.params.DisMaxParams;
@@ -58,8 +59,6 @@ public class BmaxQueryParser extends ExtendedDismaxQParser {
     * @param synonymAnalyzer
     *           the analyzer to parse synonyms out of the outcome of the <code>queryParsingAnalyzer</code>
     * @param subtopicAnalyzer
-    * @param boostUpAnalyzer
-    * @param boostDownAnalyzer
     */
    public BmaxQueryParser(String qstr, SolrParams localParams, SolrParams params, SolrQueryRequest req,
          Analyzer queryParsingAnalyzer, Analyzer synonymAnalyzer, Analyzer subtopicAnalyzer,
@@ -132,26 +131,22 @@ public class BmaxQueryParser extends ExtendedDismaxQParser {
       for (Entry<String, Float> field : query.getFieldsAndBoosts().entrySet()) {
 
          // fill on cache miss
-         FieldTermsDictionary cache = fieldTermCache.get(field.getKey());
-         if (cache == null) {
+         FieldTermsDictionary fieldTerms = fieldTermCache.get(field.getKey());
+         if (fieldTerms == null) {
+
+            org.apache.lucene.index.Terms terms = getReq().getSearcher().getLeafReader().terms(field.getKey());
 
             // check the number of terms for the field. If below the configured
             // threshold, build a dictomaton lookup
-            SortedDocValues values = DocValues.getSorted(getReq().getSearcher().getLeafReader(), field.getKey());
-
-            // inspect and precache terms
-            if (values.getValueCount() < query.getMaxInspectTerms()) {
+            if (terms.size() <= query.getMaxInspectTerms()) {
                DictionaryBuilder builder = new DictionaryBuilder();
 
-               // iterate values and add to dictionary
-               TermsEnum terms = values.termsEnum();
-               while (terms.next() != null) {
-                  builder.add(terms.term().utf8ToString());
+               TermsEnum termsEnum = terms.iterator();
+               while (termsEnum.next() != null) {
+                  builder.add(termsEnum.term().utf8ToString());
                }
 
-               // add computed dictionary
-               fieldTermCache
-                     .put(field.getKey(), new FieldTermsDictionary(builder.build()));
+               fieldTermCache.put(field.getKey(), new FieldTermsDictionary(builder.build()));
             } else {
                fieldTermCache.put(field.getKey(), new FieldTermsDictionary());
             }
