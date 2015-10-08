@@ -6,9 +6,6 @@ import java.util.Locale;
 import java.util.Map.Entry;
 
 import org.apache.lucene.analysis.Analyzer;
-import org.apache.lucene.index.DocValues;
-import org.apache.lucene.index.SortedDocValues;
-import org.apache.lucene.index.SortedSetDocValues;
 import org.apache.lucene.index.TermsEnum;
 import org.apache.lucene.search.Query;
 import org.apache.solr.common.params.DisMaxParams;
@@ -20,6 +17,8 @@ import org.apache.solr.search.ExtendedDismaxQParser;
 import org.apache.solr.search.SolrCache;
 import org.apache.solr.search.SyntaxError;
 import org.apache.solr.util.SolrPluginUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.Predicate;
@@ -32,6 +31,8 @@ import com.s24.search.solr.util.BmaxDebugInfo;
 import eu.danieldk.dictomaton.DictionaryBuilder;
 
 public class BmaxQueryParser extends ExtendedDismaxQParser {
+
+   private static final Logger log = LoggerFactory.getLogger(BmaxQueryParser.class);
 
    public static final String PARAM_SYNONYM_ENABLE = "bmax.synonym";
    public static final String PARAM_SYNONYM_BOOST = "bmax.synonym.boost";
@@ -82,19 +83,7 @@ public class BmaxQueryParser extends ExtendedDismaxQParser {
 
       // analyze terms
       if (query.isBuildTermsInspectionCache() && fieldTermCache != null) {
-         try {
-            long start = System.currentTimeMillis();
-            analyzeQueryFields(query);
-
-            // add debug
-            if (SolrRequestInfo.getRequestInfo() != null) {
-               ResponseBuilder rb = SolrRequestInfo.getRequestInfo().getResponseBuilder();
-               BmaxDebugInfo.add(rb, "bmax.inspect", String.format(Locale.US, "Built term inspection cache in %sms",
-                     (System.currentTimeMillis() - start)));
-            }
-         } catch (Exception e) {
-            throw new SyntaxError(e);
-         }
+         buildFieldTermCache(query);
       }
 
       // build query
@@ -124,33 +113,44 @@ public class BmaxQueryParser extends ExtendedDismaxQParser {
       return result;
    }
 
-   protected void analyzeQueryFields(BmaxQuery query) throws Exception {
+   protected void buildFieldTermCache(BmaxQuery query) {
       checkNotNull(query, "Pre-condition violated: query must not be null.");
 
-      // iterate query fields
-      for (Entry<String, Float> field : query.getFieldsAndBoosts().entrySet()) {
+      long start = System.currentTimeMillis();
+      try {
+         // iterate query fields
+         for (Entry<String, Float> field : query.getFieldsAndBoosts().entrySet()) {
 
-         // fill on cache miss
-         FieldTermsDictionary fieldTerms = fieldTermCache.get(field.getKey());
-         if (fieldTerms == null) {
+            // fill on cache miss
+            FieldTermsDictionary fieldTerms = fieldTermCache.get(field.getKey());
+            if (fieldTerms == null) {
 
-            org.apache.lucene.index.Terms terms = getReq().getSearcher().getLeafReader().terms(field.getKey());
+               org.apache.lucene.index.Terms terms = getReq().getSearcher().getLeafReader().terms(field.getKey());
 
-            // check the number of terms for the field. If below the configured
-            // threshold, build a dictomaton lookup
-            if (terms.size() <= query.getMaxInspectTerms()) {
-               DictionaryBuilder builder = new DictionaryBuilder();
+               // check the number of terms for the field. If below the configured
+               // threshold, build a dictomaton lookup
+               if (terms.size() <= query.getMaxInspectTerms()) {
+                  DictionaryBuilder builder = new DictionaryBuilder();
 
-               TermsEnum termsEnum = terms.iterator();
-               while (termsEnum.next() != null) {
-                  builder.add(termsEnum.term().utf8ToString());
+                  TermsEnum termsEnum = terms.iterator();
+                  while (termsEnum.next() != null) {
+                     builder.add(termsEnum.term().utf8ToString());
+                  }
+
+                  fieldTermCache.put(field.getKey(), new FieldTermsDictionary(builder.build()));
+               } else {
+                  fieldTermCache.put(field.getKey(), new FieldTermsDictionary());
                }
-
-               fieldTermCache.put(field.getKey(), new FieldTermsDictionary(builder.build()));
-            } else {
-               fieldTermCache.put(field.getKey(), new FieldTermsDictionary());
             }
          }
+
+         if (SolrRequestInfo.getRequestInfo() != null) {
+            ResponseBuilder rb = SolrRequestInfo.getRequestInfo().getResponseBuilder();
+            BmaxDebugInfo.add(rb, "bmax.inspect", String.format(Locale.US, "Built term inspection cache in %sms",
+                  (System.currentTimeMillis() - start)));
+         }
+      } catch (Exception e) {
+         log.warn("Failed to build fieldTermCache", e);
       }
    }
 
