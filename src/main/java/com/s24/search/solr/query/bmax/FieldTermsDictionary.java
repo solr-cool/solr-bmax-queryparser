@@ -2,7 +2,12 @@ package com.s24.search.solr.query.bmax;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
+import java.io.IOException;
+import java.io.ObjectOutputStream;
+
 import com.google.common.base.Objects;
+import com.google.common.io.ByteStreams;
+import com.google.common.io.CountingOutputStream;
 
 import eu.danieldk.dictomaton.Dictionary;
 
@@ -12,6 +17,7 @@ import eu.danieldk.dictomaton.Dictionary;
 public class FieldTermsDictionary {
 
    private final Dictionary terms;
+   private final long estimatedMemorySize;
 
    /**
     * Creates a term dictionary which does not know the terms of its field. The returned dictionary will return
@@ -19,6 +25,7 @@ public class FieldTermsDictionary {
     */
    public FieldTermsDictionary() {
       this.terms = null;
+      this.estimatedMemorySize = 0;
    }
 
    /**
@@ -28,6 +35,18 @@ public class FieldTermsDictionary {
     */
    public FieldTermsDictionary(Dictionary terms) {
       this.terms = checkNotNull(terms);
+
+      // A hack to estimate the memory size of the dictionary
+      long bytes = -1;
+      try (CountingOutputStream cos = new CountingOutputStream(ByteStreams.nullOutputStream());
+            ObjectOutputStream oos = new ObjectOutputStream(cos)) {
+         oos.writeObject(terms);
+         oos.flush();
+         bytes = cos.getCount();
+      } catch (IOException e) {
+         // ignore
+      }
+      this.estimatedMemorySize = bytes;
    }
 
    /**
@@ -41,8 +60,8 @@ public class FieldTermsDictionary {
    @Override
    public String toString() {
       return Objects.toStringHelper(this)
-            .add("hasTerms", terms != null)
-            .add("size", terms == null ? 0 : terms.size())
+            .add("termCount", terms == null ? 0 : terms.size())
+            .add("estimatedMemorySize", estimatedMemorySize)
             .toString();
    }
 }
