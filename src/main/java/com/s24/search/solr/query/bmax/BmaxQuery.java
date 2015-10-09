@@ -30,7 +30,6 @@ public class BmaxQuery {
    private float tieBreakerMultiplier = 0.0f;
    private boolean inspectTerms = false;
    private boolean buildTermsInspectionCache = false;
-   private int maxInspectTerms = 1024;
 
    public Map<String, Float> getFieldsAndBoosts() {
       return fieldsAndBoosts;
@@ -78,14 +77,6 @@ public class BmaxQuery {
 
    public void setTieBreakerMultiplier(float tieBreakerMultiplier) {
       this.tieBreakerMultiplier = tieBreakerMultiplier;
-   }
-
-   public int getMaxInspectTerms() {
-      return maxInspectTerms;
-   }
-
-   public void setMaxInspectTerms(int maxInspectTerms) {
-      this.maxInspectTerms = maxInspectTerms;
    }
 
    public boolean isInspectTerms() {

@@ -195,7 +195,6 @@ This version leverages a experimental feature called term inspection. Before add
 
 * `bmax.inspect` (boolean) – Use the local term inspection cache to validate term query clauses. Default is `false`.
 * `bmax.inspect.build` (boolean) – Build a local term inspection cache using the given `qf`. Default is `false`
-* `bmax.inspect.maxterms` (integer) – Max numbers of distinct field terms to include a field in the term inspection cache. Default is `4096`. 
 
 In order to use the feature, create a custom Solr cache `bmax.fieldTermCache`. The cache entries will be saved as [Dictomaton FSTs](https://github.com/danieldk/dictomaton) in order to consume as less heap as possible.
 

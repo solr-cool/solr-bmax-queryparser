@@ -42,7 +42,6 @@ public class BmaxQueryParser extends ExtendedDismaxQParser {
    public static final String PARAM_TIE = DisMaxParams.TIE;
    public static final String PARAM_INSPECT_TERMS = "bmax.inspect";
    public static final String PARAM_BUILD_INSPECT_TERMS = "bmax.inspect.build";
-   public static final String PARAM_INSPECT_MAX_TERMS = "bmax.inspect.maxterms";
 
    private static final String WILDCARD = "*:*";
 
@@ -151,23 +150,14 @@ public class BmaxQueryParser extends ExtendedDismaxQParser {
             // fill on cache miss
             FieldTermsDictionary fieldTerms = fieldTermCache.get(field.getKey());
             if (fieldTerms == null) {
-
+               DictionaryBuilder builder = new DictionaryBuilder();
                org.apache.lucene.index.Terms terms = getReq().getSearcher().getLeafReader().terms(field.getKey());
-
-               // check the number of terms for the field. If below the configured
-               // threshold, build a dictomaton lookup
-               if (terms.size() <= query.getMaxInspectTerms()) {
-                  DictionaryBuilder builder = new DictionaryBuilder();
-
-                  TermsEnum termsEnum = terms.iterator();
-                  while (termsEnum.next() != null) {
-                     builder.add(termsEnum.term().utf8ToString());
-                  }
-
-                  fieldTermCache.put(field.getKey(), new FieldTermsDictionary(builder.build()));
-               } else {
-                  fieldTermCache.put(field.getKey(), new FieldTermsDictionary());
+               TermsEnum termsEnum = terms.iterator();
+               while (termsEnum.next() != null) {
+                  builder.add(termsEnum.term().utf8ToString());
                }
+
+               fieldTermCache.put(field.getKey(), new FieldTermsDictionary(builder.build()));
             }
          }
 
@@ -191,7 +181,6 @@ public class BmaxQueryParser extends ExtendedDismaxQParser {
       query.setSubtopicBoost(params.getFloat(PARAM_SUBTOPIC_BOOST, 0.01f));
       query.setTieBreakerMultiplier(params.getFloat(PARAM_TIE, 0.00f));
       query.setInspectTerms(params.getBool(PARAM_INSPECT_TERMS, false));
-      query.setMaxInspectTerms(params.getInt(PARAM_INSPECT_MAX_TERMS, 1024 * 8));
       query.setBuildTermsInspectionCache(params.getBool(PARAM_BUILD_INSPECT_TERMS, false));
 
       try {
