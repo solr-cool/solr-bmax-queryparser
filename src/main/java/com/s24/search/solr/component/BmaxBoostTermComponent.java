@@ -137,15 +137,7 @@ public class BmaxBoostTermComponent extends SearchComponent {
 
          // add boosts
          if (!terms.isEmpty()) {
-            /*
-             * Create a boost query, which is a bmax query. Using the bmax query parser here enables the use of the
-             * bmax.inspect feature, which will search for the boost terms only in those fields where at least one
-             * document in the index contains the term. We disable boosting, synonyms and subtopic expansion for the
-             * boost query. Debug is also disabled because otherwise the nested query would overwrite debug information
-             * added to the result by the main query, if the main query is also a bmax query.
-             */
-            params.add("bq", String.format(Locale.US,
-                  "{!bmax bmax.booster=false bmax.synonym=false bmax.subtopic=false qf='%s' debug=false mm=1 bq=''} %s",
+            params.add("bq", String.format(Locale.US, "{!dismax qf='%s' mm=1 bq=''} %s",
                   rb.req.getParams().get(BOOST_FIELDS, computeFactorizedQueryFields(rb.req, boostFactor)),
                   Joiner.on(' ').join(terms)));
 
