@@ -62,6 +62,9 @@ public class BmaxBoostTermComponent extends SearchComponent {
    // parses query
    private String queryParsingFieldType;
 
+   // the defType for the boost query generated for the boost terms
+   private String boostQueryType;
+
    @Override
    public void init(@SuppressWarnings("rawtypes") NamedList args) {
       super.init(args);
@@ -71,6 +74,7 @@ public class BmaxBoostTermComponent extends SearchComponent {
       synonymFieldType = configuration.get("synonymFieldType");
       boostTermFieldType = configuration.get("boostTermFieldType");
       penalizeTermFieldType = configuration.get("penalizeTermFieldType");
+      boostQueryType = configuration.get("boostQueryType", "dismax");
    }
 
    @Override
@@ -137,7 +141,7 @@ public class BmaxBoostTermComponent extends SearchComponent {
 
          // add boosts
          if (!terms.isEmpty()) {
-            params.add("bq", String.format(Locale.US, "{!dismax qf='%s' mm=1 bq=''} %s",
+            params.add("bq", String.format(Locale.US, "{!%s qf='%s' mm=1 bq=''} %s", boostQueryType,
                   rb.req.getParams().get(BOOST_FIELDS, computeFactorizedQueryFields(rb.req, boostFactor)),
                   Joiner.on(' ').join(terms)));
 
