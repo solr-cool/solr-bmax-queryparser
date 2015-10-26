@@ -28,7 +28,6 @@ import com.google.common.collect.Collections2;
 import com.google.common.collect.Iterables;
 import com.s24.search.solr.query.bmax.BmaxQuery.BmaxTerm;
 import com.s24.search.solr.util.BmaxDebugInfo;
-
 import eu.danieldk.dictomaton.DictionaryBuilder;
 
 public class BmaxQueryParser extends ExtendedDismaxQParser {
@@ -152,9 +151,10 @@ public class BmaxQueryParser extends ExtendedDismaxQParser {
             if (fieldTerms == null) {
                DictionaryBuilder builder = new DictionaryBuilder();
                org.apache.lucene.index.Terms terms = getReq().getSearcher().getLeafReader().terms(field.getKey());
-               TermsEnum termsEnum = terms.iterator();
-               while (termsEnum.next() != null) {
-                  builder.add(termsEnum.term().utf8ToString());
+               if (terms != null) {
+                  for (TermsEnum termsEnum = terms.iterator(); termsEnum.next() != null;) {
+                     builder.add(termsEnum.term().utf8ToString());
+                  }
                }
 
                fieldTermCache.put(field.getKey(), new FieldTermsDictionary(builder.build()));
