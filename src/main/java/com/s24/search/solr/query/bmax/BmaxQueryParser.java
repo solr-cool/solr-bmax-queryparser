@@ -38,6 +38,7 @@ public class BmaxQueryParser extends ExtendedDismaxQParser {
    public static final String PARAM_SYNONYM_BOOST = "bmax.synonym.boost";
    public static final String PARAM_SUBTOPIC_ENABLE = "bmax.subtopic";
    public static final String PARAM_SUBTOPIC_BOOST = "bmax.subtopic.boost";
+   public static final String PARAM_SUBTOPIC_FIELDS = "bmax.subtopic.qf";
    public static final String PARAM_TIE = DisMaxParams.TIE;
    public static final String PARAM_INSPECT_TERMS = "bmax.inspect";
    public static final String PARAM_BUILD_INSPECT_TERMS = "bmax.inspect.build";
@@ -188,10 +189,19 @@ public class BmaxQueryParser extends ExtendedDismaxQParser {
          query.getFieldsAndBoosts().putAll(
                SolrPluginUtils.parseFieldBoosts(params.getParams(DisMaxParams.QF)));
 
+         // get subtopic fields and boost, fallback to defaults
+         query.getSubtopicFieldsAndBoosts().putAll(
+               SolrPluginUtils.parseFieldBoosts(params.get(PARAM_SUBTOPIC_FIELDS, params.get(DisMaxParams.QF))));
+
          // set default field boost for the unboosted ones
          for (String fieldname : query.getFieldsAndBoosts().keySet()) {
             if (query.getFieldsAndBoosts().get(fieldname) == null) {
                query.getFieldsAndBoosts().put(fieldname, 1.0f);
+            }
+         }
+         for (String fieldname : query.getSubtopicFieldsAndBoosts().keySet()) {
+            if (query.getSubtopicFieldsAndBoosts().get(fieldname) == null) {
+               query.getSubtopicFieldsAndBoosts().put(fieldname, 1.0f);
             }
          }
 

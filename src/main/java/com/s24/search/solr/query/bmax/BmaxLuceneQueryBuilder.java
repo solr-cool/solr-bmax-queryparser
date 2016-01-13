@@ -174,9 +174,18 @@ public class BmaxLuceneQueryBuilder {
                            bmaxquery.getSynonymBoost()));
             }
          }
+      }
 
-         // add subtopic clause
-         if (!term.getSubtopics().isEmpty()) {
+      // if we have subtopics for the current term
+      if (!term.getSubtopics().isEmpty()) {
+         
+         // iterate subtopic fields and build concrete queries
+         for (String field : bmaxquery.getSubtopicFieldsAndBoosts().keySet()) {
+
+            // get analyzer to work with
+            Analyzer analyzer = schema.getField(field).getType().getQueryAnalyzer();
+
+            // add subtopic clause
             for (CharSequence subtopic : term.getSubtopics()) {
                dismaxQuery.add(
                      buildTermQueries(field,
@@ -210,7 +219,8 @@ public class BmaxLuceneQueryBuilder {
             fieldTerms = fieldTermCache.get(field);
          }
 
-         // Add the term to the query if we don't have a cache, or if the cache says that the field may contain the term
+         // Add the term to the query if we don't have a cache, or if the cache
+         // says that the field may contain the term
          if (fieldTerms == null || fieldTerms.fieldMayContainTerm(term.text())) {
             queries.add(buildTermQuery(term, bmaxquery.getFieldsAndBoosts().get(field) * extraBoost));
          }

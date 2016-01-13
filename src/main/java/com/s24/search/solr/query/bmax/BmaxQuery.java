@@ -21,6 +21,7 @@ public class BmaxQuery {
 
    // fields to query and their boosts
    private final Map<String, Float> fieldsAndBoosts = Maps.newHashMap();
+   private final Map<String, Float> subtopicFieldsAndBoosts = Maps.newHashMap();
 
    // boost for synonyms
    private boolean synonymEnabled = true;
@@ -33,6 +34,10 @@ public class BmaxQuery {
 
    public Map<String, Float> getFieldsAndBoosts() {
       return fieldsAndBoosts;
+   }
+
+   public Map<String, Float> getSubtopicFieldsAndBoosts() {
+      return subtopicFieldsAndBoosts;
    }
 
    public boolean isSynonymEnabled() {
