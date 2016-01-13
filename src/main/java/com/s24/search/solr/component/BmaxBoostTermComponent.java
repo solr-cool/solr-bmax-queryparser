@@ -44,6 +44,7 @@ public class BmaxBoostTermComponent extends SearchComponent {
    private static final String PENALIZE_DOC_COUNT = COMPONENT_NAME + ".penalize.docs";
    private static final String PENALIZE_FACTOR = COMPONENT_NAME + ".penalize.factor";
    private static final String PENALIZE_ENABLE = COMPONENT_NAME + ".penalize";
+   private static final String PENALIZE_FIELDS = COMPONENT_NAME + ".penalize.qf";
    private static final String BOOST_EXTRA_TERMS = COMPONENT_NAME + ".boost.extra";
    private static final String BOOST_ENABLE = COMPONENT_NAME + ".boost";
    private static final String BOOST_FACTOR = COMPONENT_NAME + ".boost.factor";
@@ -170,9 +171,11 @@ public class BmaxBoostTermComponent extends SearchComponent {
             String joinedTerms = Joiner.on(" OR ").join(terms);
 
             // iterate query fields
+            String fields = rb.req.getParams().get(
+                  PENALIZE_FIELDS, 
+                  rb.req.getParams().get(DisMaxParams.QF));
             StringBuilder rerank = new StringBuilder();
-            Map<String, Float> queryFields = SolrPluginUtils.parseFieldBoosts(rb.req.getParams().getParams(
-                  DisMaxParams.QF));
+            Map<String, Float> queryFields = SolrPluginUtils.parseFieldBoosts(fields);
             for (Entry<String, Float> field : queryFields.entrySet()) {
                if (rerank.length() > 0) {
                   rerank.append(" OR ");
