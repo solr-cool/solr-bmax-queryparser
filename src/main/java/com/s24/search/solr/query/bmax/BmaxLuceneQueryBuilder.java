@@ -4,6 +4,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Map.Entry;
 
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.index.Term;
@@ -154,23 +155,23 @@ public class BmaxLuceneQueryBuilder {
       DisjunctionMaxQuery dismaxQuery = new DisjunctionMaxQuery(bmaxquery.getTieBreakerMultiplier());
 
       // iterate fields and build concrete queries
-      for (String field : bmaxquery.getFieldsAndBoosts().keySet()) {
+      for (Entry<String, Float> field : bmaxquery.getFieldsAndBoosts().entrySet()) {
 
          // get analyzer to work with
-         Analyzer analyzer = schema.getField(field).getType().getQueryAnalyzer();
+         Analyzer analyzer = schema.getField(field.getKey()).getType().getQueryAnalyzer();
 
          // add main term clause
          dismaxQuery.add(
-               buildTermQueries(field,
-                     Terms.collectTerms(term.getTerm(), analyzer, field),
+               buildTermQueries(field.getKey(), field.getValue().floatValue(),
+                     Terms.collectTerms(term.getTerm(), analyzer, field.getKey()),
                      USER_QUERY_FIELD_BOOST));
 
          // add synonym clause
          if (!term.getSynonyms().isEmpty()) {
             for (CharSequence synonym : term.getSynonyms()) {
                dismaxQuery.add(
-                     buildTermQueries(field,
-                           Terms.collectTerms(synonym, analyzer, field),
+                     buildTermQueries(field.getKey(), field.getValue().floatValue(),
+                           Terms.collectTerms(synonym, analyzer, field.getKey()),
                            bmaxquery.getSynonymBoost()));
             }
          }
@@ -180,16 +181,16 @@ public class BmaxLuceneQueryBuilder {
       if (!term.getSubtopics().isEmpty()) {
          
          // iterate subtopic fields and build concrete queries
-         for (String field : bmaxquery.getSubtopicFieldsAndBoosts().keySet()) {
+         for (Entry<String, Float> field : bmaxquery.getSubtopicFieldsAndBoosts().entrySet()) {
 
             // get analyzer to work with
-            Analyzer analyzer = schema.getField(field).getType().getQueryAnalyzer();
+            Analyzer analyzer = schema.getField(field.getKey()).getType().getQueryAnalyzer();
 
             // add subtopic clause
             for (CharSequence subtopic : term.getSubtopics()) {
                dismaxQuery.add(
-                     buildTermQueries(field,
-                           Terms.collectTerms(subtopic, analyzer, field),
+                     buildTermQueries(field.getKey(), field.getValue().floatValue(),
+                           Terms.collectTerms(subtopic, analyzer, field.getKey()),
                            bmaxquery.getSubtopicBoost()));
             }
          }
@@ -203,7 +204,7 @@ public class BmaxLuceneQueryBuilder {
    /**
     * Combines the given terms to a valid dismax query for the field given.
     */
-   protected Collection<Query> buildTermQueries(String field, Collection<Term> terms, float extraBoost) {
+   protected Collection<Query> buildTermQueries(String field, float fieldBoost, Collection<Term> terms, float extraBoost) {
       checkNotNull(field, "Pre-condition violated: field must not be null.");
       checkNotNull(terms, "Pre-condition violated: terms must not be null.");
 
@@ -222,7 +223,7 @@ public class BmaxLuceneQueryBuilder {
          // Add the term to the query if we don't have a cache, or if the cache
          // says that the field may contain the term
          if (fieldTerms == null || fieldTerms.fieldMayContainTerm(term.text())) {
-            queries.add(buildTermQuery(term, bmaxquery.getFieldsAndBoosts().get(field) * extraBoost));
+            queries.add(buildTermQuery(term, fieldBoost * extraBoost));
          }
       }
 
