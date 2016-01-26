@@ -1,12 +1,13 @@
 package com.s24.search.solr.util.packed;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 import java.text.NumberFormat;
 
 import org.apache.commons.lang.math.RandomUtils;
+import org.apache.lucene.codecs.compressing.GrowableByteArrayDataOutput;
 import org.apache.lucene.store.ByteArrayDataInput;
-import org.apache.lucene.util.GrowableByteArrayDataOutput;
 import org.apache.lucene.util.packed.GrowableWriter;
 import org.apache.lucene.util.packed.PackedInts;
 import org.apache.lucene.util.packed.PackedInts.Reader;
