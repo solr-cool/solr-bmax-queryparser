@@ -2,13 +2,18 @@ package com.s24.search.solr.query.bmax;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.index.Term;
+import org.apache.lucene.queries.function.BoostedQuery;
+import org.apache.lucene.queries.function.ValueSource;
+import org.apache.lucene.queries.function.valuesource.ConstValueSource;
 import org.apache.lucene.search.BooleanClause;
 import org.apache.lucene.search.BooleanQuery;
 import org.apache.lucene.search.DisjunctionMaxQuery;
@@ -87,13 +92,13 @@ public class TermInspectingDismaxQParser extends QParser {
     * Builds a dismax query for the given term in all query fields.
     */
    private Query buildDismaxQuery(CharSequence term) {
-      DisjunctionMaxQuery query = new DisjunctionMaxQuery(config.tiebreaker);
+      List<Query> disjuncts = new ArrayList<>();
 
       for (String field : config.queryFields.keySet()) {
          Analyzer analyzer = getReq().getSchema().getField(field).getType().getQueryAnalyzer();
-         query.add(buildTermQueries(field, Terms.collectTerms(term, analyzer, field)));
+         disjuncts.addAll(buildTermQueries(field, Terms.collectTerms(term, analyzer, field)));
       }
-      return query;
+      return new DisjunctionMaxQuery(disjuncts, config.tiebreaker);
    }
 
    /**
@@ -111,10 +116,11 @@ public class TermInspectingDismaxQParser extends QParser {
          // Add a term query to the result unless we have a field terms dictionary and we know, based on that
          // dictionary, that the term does not occur in the field
          if (fieldTerms == null || fieldTerms.fieldMayContainTerm(term.text())) {
-            TermQuery termQuery = new TermQuery(term);
+            Query termQuery = new TermQuery(term);
             if (config.queryFields.get(field) != null) {
                // We have a non-default boost value
-               termQuery.setBoost(config.queryFields.get(field));
+               ValueSource bosstedValueSource = new ConstValueSource(config.queryFields.get(field));
+               termQuery = new BoostedQuery(query, bosstedValueSource);
             }
             result.add(termQuery);
          }

@@ -2,6 +2,7 @@ package com.s24.search.solr.query.bmax;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map.Entry;
@@ -10,6 +11,7 @@ import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.index.Term;
 import org.apache.lucene.queries.function.BoostedQuery;
 import org.apache.lucene.queries.function.ValueSource;
+import org.apache.lucene.queries.function.valuesource.ConstValueSource;
 import org.apache.lucene.queries.function.valuesource.ProductFloatFunction;
 import org.apache.lucene.search.BooleanClause;
 import org.apache.lucene.search.BooleanClause.Occur;
@@ -146,13 +148,12 @@ public class BmaxLuceneQueryBuilder {
    // ---- main query
 
    /**
-    * Builds a dismax query for the given terms and their corresponding
-    * synonyms.
+    * Builds a dismax query for the given terms and their corresponding synonyms.
     */
    protected Query buildDismaxQuery(BmaxTerm term) {
       checkNotNull(term, "Pre-condition violated: term must not be null.");
 
-      DisjunctionMaxQuery dismaxQuery = new DisjunctionMaxQuery(bmaxquery.getTieBreakerMultiplier());
+      List<Query> dismaxQueries = new ArrayList<>();
 
       // iterate fields and build concrete queries
       for (Entry<String, Float> field : bmaxquery.getFieldsAndBoosts().entrySet()) {
@@ -161,7 +162,7 @@ public class BmaxLuceneQueryBuilder {
          Analyzer analyzer = schema.getField(field.getKey()).getType().getQueryAnalyzer();
 
          // add main term clause
-         dismaxQuery.add(
+         dismaxQueries.addAll(
                buildTermQueries(field.getKey(), field.getValue().floatValue(),
                      Terms.collectTerms(term.getTerm(), analyzer, field.getKey()),
                      USER_QUERY_FIELD_BOOST));
@@ -169,7 +170,7 @@ public class BmaxLuceneQueryBuilder {
          // add synonym clause
          if (!term.getSynonyms().isEmpty()) {
             for (CharSequence synonym : term.getSynonyms()) {
-               dismaxQuery.add(
+               dismaxQueries.addAll(
                      buildTermQueries(field.getKey(), field.getValue().floatValue(),
                            Terms.collectTerms(synonym, analyzer, field.getKey()),
                            bmaxquery.getSynonymBoost()));
@@ -179,7 +180,7 @@ public class BmaxLuceneQueryBuilder {
 
       // if we have subtopics for the current term
       if (!term.getSubtopics().isEmpty()) {
-         
+
          // iterate subtopic fields and build concrete queries
          for (Entry<String, Float> field : bmaxquery.getSubtopicFieldsAndBoosts().entrySet()) {
 
@@ -188,7 +189,7 @@ public class BmaxLuceneQueryBuilder {
 
             // add subtopic clause
             for (CharSequence subtopic : term.getSubtopics()) {
-               dismaxQuery.add(
+               dismaxQueries.addAll(
                      buildTermQueries(field.getKey(), field.getValue().floatValue(),
                            Terms.collectTerms(subtopic, analyzer, field.getKey()),
                            bmaxquery.getSubtopicBoost()));
@@ -196,7 +197,7 @@ public class BmaxLuceneQueryBuilder {
          }
       }
 
-      return dismaxQuery;
+      return new DisjunctionMaxQuery(dismaxQueries, bmaxquery.getTieBreakerMultiplier());
    }
 
    // ---- term queries
@@ -204,7 +205,8 @@ public class BmaxLuceneQueryBuilder {
    /**
     * Combines the given terms to a valid dismax query for the field given.
     */
-   protected Collection<Query> buildTermQueries(String field, float fieldBoost, Collection<Term> terms, float extraBoost) {
+   protected Collection<Query> buildTermQueries(String field, float fieldBoost, Collection<Term> terms,
+         float extraBoost) {
       checkNotNull(field, "Pre-condition violated: field must not be null.");
       checkNotNull(terms, "Pre-condition violated: terms must not be null.");
 
@@ -233,15 +235,16 @@ public class BmaxLuceneQueryBuilder {
    /**
     * Builds a term query and manipulates the document frequency, if given.
     */
-   protected TermQuery buildTermQuery(Term term, float boost) {
+   protected Query buildTermQuery(Term term, float boost) {
       checkNotNull(term, "Pre-condition violated: term must not be null.");
 
-      TermQuery query = new TermQuery(term);
+      Query query = new TermQuery(term);
       queryClauseCount++;
 
       // set boost
       if (boost > 0f) {
-         query.setBoost(boost);
+         ValueSource bosstedValueSource = new ConstValueSource(boost);
+         query = new BoostedQuery(query, bosstedValueSource);
       }
 
       return query;

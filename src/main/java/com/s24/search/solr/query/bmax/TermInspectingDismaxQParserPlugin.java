@@ -3,7 +3,6 @@ package com.s24.search.solr.query.bmax;
 import static com.google.common.base.Preconditions.checkNotNull;
 
 import org.apache.lucene.analysis.Analyzer;
-import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.params.SolrParams;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.request.SolrQueryRequest;
