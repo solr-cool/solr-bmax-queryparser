@@ -210,7 +210,6 @@ Define new versions
     
     $ export NEXT_VERSION=<version>
     $ export NEXT_DEVELOPMENT_VERSION=<version>-SNAPSHOT
-    $ export JAVA_HOME="$(/usr/libexec/java_home -v 1.7.0)" && java -version
 
 Then execute the release chain
 
