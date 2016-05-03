@@ -120,9 +120,11 @@ public class TermInspectingDismaxQParser extends QParser {
             if (config.queryFields.get(field) != null) {
                // We have a non-default boost value
                ValueSource bosstedValueSource = new ConstValueSource(config.queryFields.get(field));
-               termQuery = new BoostedQuery(query, bosstedValueSource);
+               
+               result.add(new BoostedQuery(termQuery, bosstedValueSource));
+            } else {
+               result.add(termQuery);
             }
-            result.add(termQuery);
          }
       }
       return result;

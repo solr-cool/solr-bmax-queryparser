@@ -243,8 +243,7 @@ public class BmaxLuceneQueryBuilder {
 
       // set boost
       if (boost > 0f) {
-         ValueSource bosstedValueSource = new ConstValueSource(boost);
-         query = new BoostedQuery(query, bosstedValueSource);
+         return new BoostedQuery(query, new ConstValueSource(boost));
       }
 
       return query;
