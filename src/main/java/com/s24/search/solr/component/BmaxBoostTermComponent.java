@@ -13,6 +13,7 @@ import org.apache.lucene.analysis.Analyzer;
 import org.apache.solr.common.params.CommonParams;
 import org.apache.solr.common.params.DisMaxParams;
 import org.apache.solr.common.params.ModifiableSolrParams;
+import org.apache.solr.common.params.ShardParams;
 import org.apache.solr.common.params.SolrParams;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.handler.component.ResponseBuilder;
@@ -81,13 +82,15 @@ public class BmaxBoostTermComponent extends SearchComponent {
    @Override
    public void prepare(ResponseBuilder rb) throws IOException {
       checkNotNull(rb, "Pre-condition violated: rb must not be null.");
+      SolrParams solrParams = rb.req.getParams();
 
-      // check component is activated
-      if (rb.req.getParams().getBool(COMPONENT_NAME, false)) {
+      // Only run this component if it is active and this is not a subrequest (we want to add the boost terms
+      // only on the initial request that Solr receives from the outside).
+      if (solrParams.getBool(COMPONENT_NAME, false) && !solrParams.getBool(ShardParams.IS_SHARD, false)) {
 
          // check preconditions
-         String q = rb.req.getParams().get(CommonParams.Q);
-         String sort = rb.req.getParams().get(CommonParams.SORT);
+         String q = solrParams.get(CommonParams.Q);
+         String sort = solrParams.get(CommonParams.SORT);
 
          if (q != null
                && !"*:*".equals(q)
