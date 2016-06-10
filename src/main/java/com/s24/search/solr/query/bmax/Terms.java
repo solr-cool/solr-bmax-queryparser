@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.apache.commons.io.input.CharSequenceReader;
 import org.apache.lucene.analysis.Analyzer;
@@ -29,8 +30,10 @@ public class Terms {
    /**
     * Analyzes the given string using the given {@link Analyzer} (-chain).
     *
-    * @param input    Input string.
-    * @param analyzer Analyzer.
+    * @param input
+    *           Input string.
+    * @param analyzer
+    *           Analyzer.
     * @return All terms from the resulting token stream.
     */
    public static Set<CharSequence> collect(CharSequence input, Analyzer analyzer) {
@@ -62,8 +65,7 @@ public class Terms {
    }
 
    /**
-    * Collects terms from the given analyzer relying on {@linkplain BytesRef}s
-    * and not strings.
+    * Collects terms from the given analyzer relying on {@linkplain BytesRef}s and not strings.
     */
    public static Collection<Term> collectTerms(CharSequence input, Analyzer analyzer, String field) {
       checkNotNull(input, "Pre-condition violated: input must not be null.");
@@ -93,6 +95,16 @@ public class Terms {
       }
 
       return result;
+   }
+
+   /**
+    * Collects terms from the given analyzer relying on {@linkplain BytesRef}s and not strings.
+    */
+   public static Collection<Term> collectTerms(Set<CharSequence> input, Analyzer analyzer, String field) {
+      return input.stream()
+            .map(s -> collectTerms(s, analyzer, field))
+            .flatMap(e -> e.stream())
+            .collect(Collectors.toList());
    }
 
    /**

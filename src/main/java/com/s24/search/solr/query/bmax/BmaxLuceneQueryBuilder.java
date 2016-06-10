@@ -9,21 +9,20 @@ import java.util.Map.Entry;
 
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.index.Term;
+import org.apache.lucene.queries.TermsQuery;
 import org.apache.lucene.queries.function.BoostedQuery;
 import org.apache.lucene.queries.function.ValueSource;
-import org.apache.lucene.queries.function.valuesource.ConstValueSource;
 import org.apache.lucene.queries.function.valuesource.ProductFloatFunction;
 import org.apache.lucene.search.BooleanClause;
 import org.apache.lucene.search.BooleanClause.Occur;
 import org.apache.lucene.search.BooleanQuery.Builder;
+import org.apache.lucene.search.BoostQuery;
 import org.apache.lucene.search.DisjunctionMaxQuery;
 import org.apache.lucene.search.MatchAllDocsQuery;
 import org.apache.lucene.search.Query;
-import org.apache.lucene.search.TermQuery;
 import org.apache.solr.schema.IndexSchema;
 import org.apache.solr.search.SolrCache;
 
-import com.google.common.collect.Sets;
 import com.s24.search.solr.query.bmax.BmaxQuery.BmaxTerm;
 
 /**
@@ -162,18 +161,22 @@ public class BmaxLuceneQueryBuilder {
          Analyzer analyzer = schema.getField(field.getKey()).getType().getQueryAnalyzer();
 
          // add main term clause
-         dismaxQueries.addAll(
-               buildTermQueries(field.getKey(), field.getValue().floatValue(),
-                     Terms.collectTerms(term.getTerm(), analyzer, field.getKey()),
-                     USER_QUERY_FIELD_BOOST));
+         Query queries = buildTermQueries(field.getKey(), field.getValue().floatValue(),
+               Terms.collectTerms(term.getTerm(), analyzer, field.getKey()),
+               USER_QUERY_FIELD_BOOST);
+         if (queries != null) {
+            dismaxQueries.add(queries);
+         }
 
          // add synonym clause
          if (!term.getSynonyms().isEmpty()) {
             for (CharSequence synonym : term.getSynonyms()) {
-               dismaxQueries.addAll(
-                     buildTermQueries(field.getKey(), field.getValue().floatValue(),
-                           Terms.collectTerms(synonym, analyzer, field.getKey()),
-                           bmaxquery.getSynonymBoost()));
+               Query termQueries = buildTermQueries(field.getKey(), field.getValue().floatValue(),
+                     Terms.collectTerms(synonym, analyzer, field.getKey()),
+                     bmaxquery.getSynonymBoost());
+               if (termQueries != null) {
+                  dismaxQueries.add(termQueries);
+               }
             }
          }
       }
@@ -189,10 +192,12 @@ public class BmaxLuceneQueryBuilder {
 
             // add subtopic clause
             for (CharSequence subtopic : term.getSubtopics()) {
-               dismaxQueries.addAll(
-                     buildTermQueries(field.getKey(), field.getValue().floatValue(),
-                           Terms.collectTerms(subtopic, analyzer, field.getKey()),
-                           bmaxquery.getSubtopicBoost()));
+               Query termQueries = buildTermQueries(field.getKey(), field.getValue().floatValue(),
+                     Terms.collectTerms(subtopic, analyzer, field.getKey()),
+                     bmaxquery.getSubtopicBoost());
+               if (termQueries != null) {
+                  dismaxQueries.add(termQueries);
+               }
             }
          }
       }
@@ -205,47 +210,47 @@ public class BmaxLuceneQueryBuilder {
    /**
     * Combines the given terms to a valid dismax query for the field given.
     */
-   protected Collection<Query> buildTermQueries(String field, float fieldBoost, Collection<Term> terms,
+   protected Query buildTermQueries(String field, float fieldBoost, Collection<Term> terms,
          float extraBoost) {
       checkNotNull(field, "Pre-condition violated: field must not be null.");
       checkNotNull(terms, "Pre-condition violated: terms must not be null.");
 
-      Collection<Query> queries = Sets.newHashSet();
-
       FieldTermsDictionary fieldTerms = null;
-      
+
       // check for term inspection && available term cache
       if (bmaxquery.isInspectTerms() && fieldTermCache != null) {
-         
+
          // or on activated term inspection
          fieldTerms = fieldTermCache.get(field);
       }
+
+      Collection<Term> filteredTerms = new ArrayList<>();
 
       for (Term term : terms) {
          // Add the term to the query if we don't have a cache, or if the cache
          // says that the field may contain the term
          if (fieldTerms == null || fieldTerms.fieldMayContainTerm(term.text())) {
-            queries.add(buildTermQuery(term, fieldBoost * extraBoost));
+            filteredTerms.add(term);
          }
       }
 
-      return queries;
+      return filteredTerms.isEmpty() ? null : buildTermQuery(filteredTerms, fieldBoost * extraBoost);
    }
 
    /**
     * Builds a term query and manipulates the document frequency, if given.
     */
-   protected Query buildTermQuery(Term term, float boost) {
-      checkNotNull(term, "Pre-condition violated: term must not be null.");
+   protected Query buildTermQuery(Collection<Term> terms, float boost) {
+      checkNotNull(terms, "Pre-condition violated: term must not be null.");
 
-      Query query = new TermQuery(term);
+      Query termsquery = new TermsQuery(terms);
       queryClauseCount++;
 
       // set boost
       if (boost > 0f) {
-         return new BoostedQuery(query, new ConstValueSource(boost));
+         return new BoostQuery(termsquery, boost);
       }
 
-      return query;
+      return termsquery;
    }
 }

@@ -4,22 +4,19 @@ import static com.google.common.base.Preconditions.checkNotNull;
 
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.index.Term;
-import org.apache.lucene.queries.function.BoostedQuery;
-import org.apache.lucene.queries.function.ValueSource;
-import org.apache.lucene.queries.function.valuesource.ConstValueSource;
+import org.apache.lucene.queries.TermsQuery;
 import org.apache.lucene.search.BooleanClause;
 import org.apache.lucene.search.BooleanQuery;
+import org.apache.lucene.search.BoostQuery;
 import org.apache.lucene.search.DisjunctionMaxQuery;
 import org.apache.lucene.search.MatchAllDocsQuery;
 import org.apache.lucene.search.Query;
-import org.apache.lucene.search.TermQuery;
 import org.apache.solr.common.params.DisMaxParams;
 import org.apache.solr.common.params.SolrParams;
 import org.apache.solr.request.SolrQueryRequest;
@@ -79,8 +76,9 @@ public class TermInspectingDismaxQParser extends QParser {
          }
 
          BooleanQuery.Builder queryBuilder = new BooleanQuery.Builder();
-         for (CharSequence term : terms) {
-            queryBuilder.add(new BooleanClause(buildDismaxQuery(term), BooleanClause.Occur.SHOULD));
+         Query dismaxQuery = buildDismaxQuery(terms);
+         if (dismaxQuery != null) {
+            queryBuilder.add(new BooleanClause(dismaxQuery, BooleanClause.Occur.SHOULD));
          }
          return queryBuilder.build();
       } catch (Exception e) {
@@ -91,44 +89,50 @@ public class TermInspectingDismaxQParser extends QParser {
    /**
     * Builds a dismax query for the given term in all query fields.
     */
-   private Query buildDismaxQuery(CharSequence term) {
+   private Query buildDismaxQuery(Set<CharSequence> term) {
       List<Query> disjuncts = new ArrayList<>();
 
       for (String field : config.queryFields.keySet()) {
          Analyzer analyzer = getReq().getSchema().getField(field).getType().getQueryAnalyzer();
-         disjuncts.addAll(buildTermQueries(field, Terms.collectTerms(term, analyzer, field)));
+         Query termQueries = buildTermQueries(field, Terms.collectTerms(term, analyzer, field));
+         if (termQueries != null) {
+            disjuncts.add(termQueries);
+         }
       }
-      return new DisjunctionMaxQuery(disjuncts, config.tiebreaker);
+      return disjuncts.isEmpty() ? null : new DisjunctionMaxQuery(disjuncts, config.tiebreaker);
    }
 
    /**
     * Creates the term queries for the given terms in the given field.
     */
-   private Collection<Query> buildTermQueries(String field, Collection<Term> terms) {
-      Collection<Query> result = new HashSet<>();
-      
+   private Query buildTermQueries(String field, Collection<Term> terms) {
+
       // Check if term inspection is enabled and we have a cached term dictionary for the field
       FieldTermsDictionary fieldTerms = null;
       if (config.inspectTerms && fieldTermCache != null) {
          fieldTerms = fieldTermCache.get(field);
       }
-      
-      for (Term term : terms) {
+
+      if (fieldTerms != null) {
          // Add a term query to the result unless we have a field terms dictionary and we know, based on that
          // dictionary, that the term does not occur in the field
-         if (fieldTerms == null || fieldTerms.fieldMayContainTerm(term.text())) {
-            Query termQuery = new TermQuery(term);
-            if (config.queryFields.get(field) != null) {
-               // We have a non-default boost value
-               ValueSource bosstedValueSource = new ConstValueSource(config.queryFields.get(field));
-               
-               result.add(new BoostedQuery(termQuery, bosstedValueSource));
-            } else {
-               result.add(termQuery);
+         Collection<Term> filteredTerms = new ArrayList<>();
+         for (Term term : terms) {
+            if (fieldTerms.fieldMayContainTerm(term.text())) {
+               filteredTerms.add(term);
             }
          }
+         terms.retainAll(filteredTerms);
       }
-      return result;
+
+      if (terms.isEmpty()) {
+         return null;
+      }
+
+      Query termsQuery = new TermsQuery(terms);
+
+      return config.queryFields.get(field) != null
+            ? new BoostQuery(termsQuery, config.queryFields.get(field)) : termsQuery;
    }
 
    /**
