@@ -106,13 +106,14 @@ public class TermInspectingDismaxQParser extends QParser {
     */
    private Collection<Query> buildTermQueries(String field, Collection<Term> terms) {
       Collection<Query> result = new HashSet<>();
+      
+      // Check if term inspection is enabled and we have a cached term dictionary for the field
+      FieldTermsDictionary fieldTerms = null;
+      if (config.inspectTerms && fieldTermCache != null) {
+         fieldTerms = fieldTermCache.get(field);
+      }
+      
       for (Term term : terms) {
-         // Check if term inspection is enabled and we have a cached term dictionary for the field
-         FieldTermsDictionary fieldTerms = null;
-         if (config.inspectTerms && fieldTermCache != null) {
-            fieldTerms = fieldTermCache.get(field);
-         }
-
          // Add a term query to the result unless we have a field terms dictionary and we know, based on that
          // dictionary, that the term does not occur in the field
          if (fieldTerms == null || fieldTerms.fieldMayContainTerm(term.text())) {

@@ -212,16 +212,16 @@ public class BmaxLuceneQueryBuilder {
 
       Collection<Query> queries = Sets.newHashSet();
 
+      FieldTermsDictionary fieldTerms = null;
+      
+      // check for term inspection && available term cache
+      if (bmaxquery.isInspectTerms() && fieldTermCache != null) {
+         
+         // or on activated term inspection
+         fieldTerms = fieldTermCache.get(field);
+      }
+
       for (Term term : terms) {
-         FieldTermsDictionary fieldTerms = null;
-
-         // check for term inspection && available term cache
-         if (bmaxquery.isInspectTerms() && fieldTermCache != null) {
-
-            // or on activated term inspection
-            fieldTerms = fieldTermCache.get(field);
-         }
-
          // Add the term to the query if we don't have a cache, or if the cache
          // says that the field may contain the term
          if (fieldTerms == null || fieldTerms.fieldMayContainTerm(term.text())) {
