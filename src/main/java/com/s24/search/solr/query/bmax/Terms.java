@@ -1,12 +1,12 @@
 package com.s24.search.solr.query.bmax;
 
 import static com.google.common.base.Preconditions.checkNotNull;
+import static java.util.stream.Collectors.toSet;
 
 import java.io.IOException;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 import org.apache.commons.io.input.CharSequenceReader;
 import org.apache.lucene.analysis.Analyzer;
@@ -17,8 +17,6 @@ import org.apache.lucene.index.Term;
 import org.apache.lucene.util.BytesRef;
 import org.apache.solr.search.SolrIndexSearcher;
 import org.apache.solr.util.SolrPluginUtils;
-
-import com.google.common.collect.Lists;
 
 /**
  * Utility methods that yet cannot be found in {@linkplain SolrPluginUtils}
@@ -67,12 +65,12 @@ public class Terms {
    /**
     * Collects terms from the given analyzer relying on {@linkplain BytesRef}s and not strings.
     */
-   public static Collection<Term> collectTerms(CharSequence input, Analyzer analyzer, String field) {
+   public static Set<Term> collectTerms(CharSequence input, Analyzer analyzer, String field) {
       checkNotNull(input, "Pre-condition violated: input must not be null.");
       checkNotNull(analyzer, "Pre-condition violated: analyzer must not be null.");
       checkNotNull(field, "Pre-condition violated: field must not be null.");
 
-      Collection<Term> result = Lists.newArrayList();
+      Set<Term> result = new HashSet<>();
       TokenStream tokenStream = null;
       try {
          tokenStream = analyzer.tokenStream(field, new CharSequenceReader(input));
@@ -100,11 +98,11 @@ public class Terms {
    /**
     * Collects terms from the given analyzer relying on {@linkplain BytesRef}s and not strings.
     */
-   public static Collection<Term> collectTerms(Set<CharSequence> input, Analyzer analyzer, String field) {
+   public static Set<Term> collectTerms(Set<CharSequence> input, Analyzer analyzer, String field) {
       return input.stream()
             .map(s -> collectTerms(s, analyzer, field))
             .flatMap(e -> e.stream())
-            .collect(Collectors.toList());
+            .collect(toSet());
    }
 
    /**

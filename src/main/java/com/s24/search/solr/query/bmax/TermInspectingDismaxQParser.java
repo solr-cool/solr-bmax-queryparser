@@ -3,7 +3,7 @@ package com.s24.search.solr.query.bmax;
 import static com.google.common.base.Preconditions.checkNotNull;
 
 import java.util.ArrayList;
-import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -105,7 +105,7 @@ public class TermInspectingDismaxQParser extends QParser {
    /**
     * Creates the term queries for the given terms in the given field.
     */
-   private Query buildTermQueries(String field, Collection<Term> terms) {
+   private Query buildTermQueries(String field, Set<Term> terms) {
 
       // Check if term inspection is enabled and we have a cached term dictionary for the field
       FieldTermsDictionary fieldTerms = null;
@@ -113,26 +113,27 @@ public class TermInspectingDismaxQParser extends QParser {
          fieldTerms = fieldTermCache.get(field);
       }
 
+      Set<Term> filteredTerms = new HashSet<>();
+      
       if (fieldTerms != null) {
          // Add a term query to the result unless we have a field terms dictionary and we know, based on that
          // dictionary, that the term does not occur in the field
-         Collection<Term> filteredTerms = new ArrayList<>();
          for (Term term : terms) {
             if (fieldTerms.fieldMayContainTerm(term.text())) {
                filteredTerms.add(term);
             }
          }
-         terms.retainAll(filteredTerms);
       }
 
-      if (terms.isEmpty()) {
+      if (filteredTerms.isEmpty()) {
          return null;
       }
 
-      Query termsQuery = new TermsQuery(terms);
+      Query termsQuery = new TermsQuery(filteredTerms);
+      Float boostValue = config.queryFields.get(field);
 
-      return config.queryFields.get(field) != null
-            ? new BoostQuery(termsQuery, config.queryFields.get(field)) : termsQuery;
+      return boostValue != null
+            ? new BoostQuery(termsQuery, boostValue) : termsQuery;
    }
 
    /**
