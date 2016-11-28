@@ -28,7 +28,9 @@ import com.google.common.collect.Collections2;
 import com.google.common.collect.Iterables;
 import com.s24.search.solr.query.bmax.BmaxQuery.BmaxTerm;
 import com.s24.search.solr.util.BmaxDebugInfo;
+
 import eu.danieldk.dictomaton.DictionaryBuilder;
+import eu.danieldk.dictomaton.DictionaryBuilderException;
 
 public class BmaxQueryParser extends ExtendedDismaxQParser {
 
@@ -55,9 +57,12 @@ public class BmaxQueryParser extends ExtendedDismaxQParser {
    /**
     * Creates a new {@linkplain BmaxQueryParser}.
     *
-    * @param qstr                 the original input query string
-    * @param queryParsingAnalyzer the analyzer to parse the query with.
-    * @param synonymAnalyzer      the analyzer to parse synonyms out of the outcome of the <code>queryParsingAnalyzer</code>
+    * @param qstr
+    *           the original input query string
+    * @param queryParsingAnalyzer
+    *           the analyzer to parse the query with.
+    * @param synonymAnalyzer
+    *           the analyzer to parse synonyms out of the outcome of the <code>queryParsingAnalyzer</code>
     * @param subtopicAnalyzer
     */
    public BmaxQueryParser(String qstr, SolrParams localParams, SolrParams params, SolrQueryRequest req,
@@ -154,7 +159,15 @@ public class BmaxQueryParser extends ExtendedDismaxQParser {
                org.apache.lucene.index.Terms terms = getReq().getSearcher().getLeafReader().terms(field.getKey());
                if (terms != null) {
                   for (TermsEnum termsEnum = terms.iterator(); termsEnum.next() != null;) {
-                     builder.add(termsEnum.term().utf8ToString());
+                     String term = termsEnum.term().utf8ToString();
+                     try {
+                        builder.add(term);
+                     } catch (DictionaryBuilderException e) {
+                        // In rare cases there are entries like unicode signs that are not in lexicographical order.
+                        // Dictomaton will throw this exception, but we just want to ignore this entry.
+                        log.warn("Term {} not added to the dictionary (may no in lexicographical order).", term,
+                              e.getMessage());
+                     }
                   }
                }
 
