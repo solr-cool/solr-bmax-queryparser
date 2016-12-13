@@ -156,7 +156,7 @@ public class BmaxQueryParser extends ExtendedDismaxQParser {
             FieldTermsDictionary fieldTerms = fieldTermCache.get(field.getKey());
             if (fieldTerms == null) {
                DictionaryBuilder builder = new DictionaryBuilder();
-               org.apache.lucene.index.Terms terms = getReq().getSearcher().getLeafReader().terms(field.getKey());
+               org.apache.lucene.index.Terms terms = getReq().getSearcher().getSlowAtomicReader().terms(field.getKey());
                if (terms != null) {
                   for (TermsEnum termsEnum = terms.iterator(); termsEnum.next() != null;) {
                      String term = termsEnum.term().utf8ToString();
