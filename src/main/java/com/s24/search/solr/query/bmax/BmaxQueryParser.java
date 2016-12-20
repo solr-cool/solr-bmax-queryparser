@@ -165,7 +165,7 @@ public class BmaxQueryParser extends ExtendedDismaxQParser {
                      } catch (DictionaryBuilderException e) {
                         // In rare cases there are entries like unicode signs that are not in lexicographical order.
                         // Dictomaton will throw this exception, but we just want to ignore this entry.
-                        log.warn("Term {} not added to the dictionary (may no in lexicographical order).", term,
+                        log.info("Term {} not added to the dictionary (may not in lexicographical order).", term,
                               e.getMessage());
                      }
                   }
