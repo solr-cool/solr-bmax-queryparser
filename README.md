@@ -13,6 +13,33 @@ with a minimum must match of 100%.
 This document covers Version 1.5.x and onwards. For the old 0.9.9 version, [take a look at
 the release branch](https://github.com/shopping24/solr-bmax-queryparser/blob/v0.9.8/README.md).
 
+## Terminology & Foundations
+
+*Synonym* - a (bidirectional) syntactic or semantic equivalent to a origin term. It will expand 
+recall and in ranking, matches on these synonyms will be scored almost as high as the origin 
+term (default 0.9). Example: _tv_ to _television_.
+
+*Subtopic* - a unidirectional specification of a origin term that will expand recall and score lower than the
+origin term. Example: _mountainbike_ to _bicycle_ or _macbook_ to _laptop_.
+
+*Penalize term* - a term that semantically describes what should rank _lower_ in a search result 
+matching the origin term. These terms will not increase recall, documents matching penalize terms 
+will rank lower. Example: _isbn_ to _mountainbike_
+
+*Boost term* - a term that semantically describes what should rank _higher_ in a search result 
+matching the origin term. These terms will not increase recall, documents matching penalize terms 
+will rank higher. Example: _hdmi_ to television_
+
+It's important to note, that query epxansions that increase recall (synonyms and subtopics) are
+bound to the origin term. Given the synonym example _violet_ to _blue_, the query _blue bike_
+would be rewriten by the bmax parser to `(violet OR blue) AND bike`. If you add the subtopic
+_mountainbike, ebike_ to _bike_, the query would be rewritten to `(violet OR blue) AND (bike OR mountainbike OR ebike)`.
+
+Out of the box synonym handling in Solr (dismax, edisxmax) loses these relationships during
+query analysis. As an example, given the synonym _violet_ to _blue_ a regular Solr synonym 
+handling would rewrite the query _blue bike_ to `blue violet bike`. Depending on your query
+parser (and `mm` setting in dismax) this could lead to higher recall with way less precision.
+
 ## Bmax query processing
 Query processing in the bmax query parser is split into 2 steps:
 
