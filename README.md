@@ -4,8 +4,9 @@ The boosting dismax query parser (bmax)
 ![travis ci build status](https://travis-ci.org/shopping24/solr-bmax-queryparser.png)
 
 A synonym aware edismax query parser for Apache Solr. The bmax query parser relies on
-field types and tokenizer chains to parse the user query, discovers synonyms, boost 
-and penalize terms at query time. Hence it is highly configurable. 
+field types and tokenizer chains to parse the user query, discovers synonyms, subtopics, boost 
+and penalize terms at query time. Hence it is highly configurable. It is the ideal query
+parser for e-commerce searches as it eliminates the usage of term and document frequency.
 
 It does *not accept* any lucene query syntax (`~-+()`). The query composed is a dismax query 
 with a minimum must match of 100%.
@@ -13,25 +14,35 @@ with a minimum must match of 100%.
 This document covers Version 1.5.x and onwards. For the old 0.9.9 version, [take a look at
 the release branch](https://github.com/shopping24/solr-bmax-queryparser/blob/v0.9.8/README.md).
 
-## Terminology & Foundations
+## Fundamentals
+
+### Terminology
 
 *Synonym* - a (bidirectional) syntactic or semantic equivalent to a origin term. It will expand 
 recall and in ranking, matches on these synonyms will be scored almost as high as the origin 
-term (default 0.9). Example: _tv_ to _television_.
+term (default 0.9). Example: `tv -> television`.
 
 *Subtopic* - a unidirectional specification of a origin term that will expand recall and score lower than the
-origin term. Example: _mountainbike_ to _bicycle_ or _macbook_ to _laptop_.
+origin term. Example: `bicycle -> mountainbike` or `laptop -> macbook`.
 
 *Penalize term* - a term that semantically describes what should rank _lower_ in a search result 
 matching the origin term. These terms will not increase recall, documents matching penalize terms 
-will rank lower. Example: _isbn_ to _mountainbike_
+will rank lower. Example: `mountainbike -> isbn`
 
 *Boost term* - a term that semantically describes what should rank _higher_ in a search result 
 matching the origin term. These terms will not increase recall, documents matching penalize terms 
-will rank higher. Example: _hdmi_ to television_
+will rank higher. Example: `television -> hdmi`
 
-It's important to note, that query epxansions that increase recall (synonyms and subtopics) are
-bound to the origin term. Given the synonym example _violet_ to _blue_, the query _blue bike_
+### document and term frequency handling
+
+The bmax query parser eliminates the usage of term and document frequency for document 
+ranking. With subtopics, synonyms, boost and penalize terms disabled and query fields set
+to a single field, all returned documents are s cored `1.0`. 
+
+### synonym and subtopic handling
+
+Query epxansions that increase recall (synonyms and subtopics) are bound to the origin term. 
+Given the synonym example _violet_ to _blue_, the query _blue bike_
 would be rewriten by the bmax parser to `(violet OR blue) AND bike`. If you add the subtopic
 _mountainbike, ebike_ to _bike_, the query would be rewritten to `(violet OR blue) AND (bike OR mountainbike OR ebike)`.
 
@@ -39,6 +50,64 @@ Out of the box synonym handling in Solr (dismax, edisxmax) loses these relations
 query analysis. As an example, given the synonym _violet_ to _blue_ a regular Solr synonym 
 handling would rewrite the query _blue bike_ to `blue violet bike`. Depending on your query
 parser (and `mm` setting in dismax) this could lead to higher recall with way less precision.
+
+## Using the Bmax query parser
+
+To take andvantage of the bmax query parser, have it properly installed and configured
+as described in the next chapter. The query parser utilizes 2 components, the _booster_
+and the _queryparser_. The booster enriches the query with boost and penalize terms,
+the query parser transforms a given user query into a Lucene search query.
+
+Use the following url parameters to fine tune your installation.
+
+### Boost component parameters
+
+The Bmax boost component enriches the query with boost and penalize terms.
+
+* `bmax.booster` (boolean) - enable/disable boost term component. Default is `false`.
+* `bmax.booster.boost` (boolean) - enable/disable boost term resolution. Default is `true`.
+* `bmax.booster.penalize` (boolean) - enable/disable penalize term resolution. Default is `true`.
+* `bmax.booster.boost.factor` (float) - boost factor that is multiplied to the boosts given in the `qf` parameter for each query field respectivly, default is `1.0`.
+* `bmax.booster.boost.extra` (String) - comma separated extra boost terms. Great to check new boost term ideas.
+* `bmax.booster.penalize.factor` (float) - Penalize factor that is used as negative weight in the rerank query. Default is `100.0`.
+* `bmax.booster.penalize.docs` (int) - The number of documents to penalize from the begin of the result set. Default is `400`.
+* `bmax.booster.penalize.extra` (String) - comma separated extra penalize terms. Great to check new ideas.
+
+### Query parser params
+
+The Bmax query parser utilizes a [Solr edismax query parser](https://lucene.apache.org/solr/guide/6_6/the-extended-dismax-query-parser.html)
+and the following standard url parameters can be used:
+
+* `q` (string) – the user query. *Lucene query syntax is not supported.*
+* `qf` (string) – [the query fields with their weights](https://lucene.apache.org/solr/guide/6_6/the-dismax-query-parser.html#TheDisMaxQueryParser-Theqf_QueryFields_Parameter).
+* `bq` (string) – [additive boost query](https://lucene.apache.org/solr/guide/6_6/the-dismax-query-parser.html#TheDisMaxQueryParser-Thebq_BoostQuery_Parameter) 
+* `bf` (string) – [additive boost functions](https://lucene.apache.org/solr/guide/6_6/the-dismax-query-parser.html#TheDisMaxQueryParser-Thebf_BoostFunctions_Parameter)
+* `tie` (string) – [the dismax tie breaker](https://lucene.apache.org/solr/guide/6_6/the-dismax-query-parser.html#TheDisMaxQueryParser-Thetie_TieBreaker_Parameter), default is `0.0`.
+* `boost` (string) – [multiplicative boost functions](https://lucene.apache.org/solr/guide/6_6/the-extended-dismax-query-parser.html#TheExtendedDisMaxQueryParser-TheboostParameter)
+
+To fine tune or debug your query, use the following extra arguments:
+
+* `bmax.synonym` (boolean) - Enable / disable synoynm lookup, default is `true`
+* `bmax.synonym.boost` (float) – The term boost to be multiplicated for synonym terms with the boost defined in the `qf` parameter for each query field respectively, default is `0.1`. 
+* `bmax.subtopic` (boolean) - Enable / disable subtopic lookup, default is `true`
+* `bmax.subtopic.boost`  (float) – The term boost to be multiplicated for subtopic terms with the boost defined in the `qf` parameter for each query field respectively, default is `0.01`. 
+* `bmax.subtopic.qf` (string) - The query fields in which to search for subtopics, defaults to the ones given in the `qf` parameter.
+
+### Query clause reduction / term inspection
+
+Before adding a term query clause to the main query or the boost query, a _term inspection cache_  can be checked, whether the term exists 
+in the field term values. If the term does not exist in the field term values, the term query clause is omitted. If you are using
+a lot of query fields, this can reduce the overall query clause count dramatically and speed up query computation.
+
+* `bmax.inspect` (boolean) – Use the local term inspection cache to validate term query clauses. Default is `false`. Set 
+  this to `true` in your main query configuration to lookup each term in the local term inspection cache.
+* `bmax.inspect.build` (boolean) – Build a local term inspection cache using the given `qf`. Default is `false`. Configure
+  a new/first searcher listener in your `solrconfig.xml` and query all documents (`*:*`) once with this parameter set
+  to `true`. Supply the fields to inspect in the `qf` parameter. 
+   
+The _term inspection cache_ is stored in a custom Solr cache named `bmax.fieldTermCache`. Configure and size a cache in
+your `solrconfig.xml`. The cache entries will be saved as [Dictomaton FSTs](https://github.com/danieldk/dictomaton) in 
+order to consume as less heap as possible.
 
 ## Bmax query processing
 Query processing in the bmax query parser is split into 2 steps:
@@ -103,7 +172,7 @@ example above would create the following query:
 
 The boost query (if given) is appended.
 
-## Installing the component
+## Installing the Bmax query parser
 
 * Place the [`solr-bmax-queryparser-<VERSION>-jar-with-dependencies.jar`](https://github.com/shopping24/solr-bmax-queryparser/releases) in the `/lib` 
   directory of your Solr installation. 
@@ -191,39 +260,6 @@ This is a example of a synonym parser. The input is each token of the query anal
       </fieldType>
 
 For the boostterm field type, the `SynonymFilter` might be handy as well.
-
-## Using the query parser
-Use the following url parameters to manipulate the boost component and query parser:
-
-### Boost component params
-* `bmax.booster` (boolean) - enable/disable boost term component Default is `false`.
-* `bmax.booster.boost` (boolean) - enable/disable boost term resolution. Default is `true`.
-* `bmax.booster.penalize` (boolean) - enable/disable penalize term resolution. Default is `true`.
-* `bmax.booster.boost.factor` (float) - boost factor that is multiplied to the boosts given in the `qf` paramter. Default is `1.0`.
-* `bmax.booster.boost.extra` (String) - comma separated extra boost terms. Great to check new ideas.
-* `bmax.booster.penalize.factor` (float) - Penalize factor that is used as negative weight in the rerank query. Default is `100.0`.
-* `bmax.booster.penalize.docs` (int) - The number of documents to penalize from the begin of the result set.. Default is `400`.
-* `bmax.booster.penalize.extra` (String) - comma separated extra penalize terms. Great to check new ideas.
-
-### Query parser params
-The query params used reflect the Solr edismax query parser.
-
-* `q` (string) – the user query. *Lucene query syntax is not supported.*
-* `qf` (string) – [the query fields with their weights](https://cwiki.apache.org/confluence/display/solr/The+DisMax+Query+Parser#TheDisMaxQueryParser).
-* `bq` (string) – [additive boost query](https://cwiki.apache.org/confluence/display/solr/The+DisMax+Query+Parser#TheDisMaxQueryParser) 
-* `bf` (string) – [additive boost functions](https://cwiki.apache.org/confluence/display/solr/The+DisMax+Query+Parser#TheDisMaxQueryParser)
-* `tie` (string) – [the dismax tie breaker](https://cwiki.apache.org/confluence/display/solr/The+DisMax+Query+Parser#TheDisMaxQueryParser). Default is `0.0`.
-* `boost` (string) – [multiplicative boost functions](https://cwiki.apache.org/confluence/display/solr/The+Extended+DisMax+Query+Parser)
-* `bmax.synonym.boost` (float) – The term boost to be multiplicated with the boost defined in the `qf` parameter for synonym terms. Default is `0.1`. 
-* `bmax.subtopic.boost`  (float) – The term boost to be multiplicated with the boost defined in the `qf` parameter for subtopic terms. Default is `0.01`. 
-
-### Experimental parser params
-This version leverages a experimental feature called term inspection. Before adding a term query clause to the main query or the boost query, the term inspection cache is checked, whether the term exists in the field term values.
-
-* `bmax.inspect` (boolean) – Use the local term inspection cache to validate term query clauses. Default is `false`.
-* `bmax.inspect.build` (boolean) – Build a local term inspection cache using the given `qf`. Default is `false`
-
-In order to use the feature, create a custom Solr cache `bmax.fieldTermCache`. The cache entries will be saved as [Dictomaton FSTs](https://github.com/danieldk/dictomaton) in order to consume as less heap as possible.
 
 ## Building the project
 
