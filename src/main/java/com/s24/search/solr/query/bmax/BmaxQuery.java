@@ -1,6 +1,7 @@
 package com.s24.search.solr.query.bmax;
 
 import java.util.Collection;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -8,6 +9,7 @@ import com.google.common.base.Function;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
+import org.apache.solr.search.FieldParams;
 
 /**
  * POJO for query data used in bmax
@@ -17,7 +19,7 @@ import com.google.common.collect.Sets;
 public class BmaxQuery {
 
    // terms with their collected synonyms and subopics
-   private final Collection<BmaxTerm> terms = Lists.newArrayList();
+   private final List<BmaxTerm> terms = Lists.newArrayList();
 
    // fields to query and their boosts
    private final Map<String, Float> fieldsAndBoosts = Maps.newHashMap();
@@ -29,8 +31,11 @@ public class BmaxQuery {
    private boolean subtopicEnabled = true;
    private float subtopicBoost = 0.01f;
    private float tieBreakerMultiplier = 0.0f;
+   // tie breaker for pf boost queries
+   private float phraseBoostTieBreaker = tieBreakerMultiplier;
    private boolean inspectTerms = false;
    private boolean buildTermsInspectionCache = false;
+   private List<FieldParams> allPhraseFields;
 
    public Map<String, Float> getFieldsAndBoosts() {
       return fieldsAndBoosts;
@@ -72,7 +77,7 @@ public class BmaxQuery {
       this.subtopicBoost = subtopicBoost;
    }
 
-   public Collection<BmaxTerm> getTerms() {
+   public List<BmaxTerm> getTerms() {
       return terms;
    }
 
@@ -82,6 +87,22 @@ public class BmaxQuery {
 
    public void setTieBreakerMultiplier(float tieBreakerMultiplier) {
       this.tieBreakerMultiplier = tieBreakerMultiplier;
+   }
+
+   public float getPhraseBoostTieBreaker() {
+      return phraseBoostTieBreaker;
+   }
+
+   public void setPhraseBoostTieBreaker(float phraseBoostTieBreaker) {
+      this.phraseBoostTieBreaker = phraseBoostTieBreaker;
+   }
+
+   public List<FieldParams> getAllPhraseFields() {
+      return allPhraseFields;
+   }
+
+   public void setAllPhraseFields(List<FieldParams> allPhraseFields) {
+      this.allPhraseFields = allPhraseFields;
    }
 
    public boolean isInspectTerms() {
