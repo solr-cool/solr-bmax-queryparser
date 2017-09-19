@@ -84,6 +84,13 @@ and the following standard url parameters can be used:
 * `bf` (string) – [additive boost functions](https://lucene.apache.org/solr/guide/6_6/the-dismax-query-parser.html#TheDisMaxQueryParser-Thebf_BoostFunctions_Parameter)
 * `tie` (string) – [the dismax tie breaker](https://lucene.apache.org/solr/guide/6_6/the-dismax-query-parser.html#TheDisMaxQueryParser-Thetie_TieBreaker_Parameter), default is `0.0`.
 * `boost` (string) – [multiplicative boost functions](https://lucene.apache.org/solr/guide/6_6/the-extended-dismax-query-parser.html#TheExtendedDisMaxQueryParser-TheboostParameter)
+* `pf` (string) - [the phrase fields](https://lucene.apache.org/solr/guide/6_6/the-dismax-query-parser.html#TheDisMaxQueryParser-Thepf_PhraseFields_Parameter)
+* `ps` (string) - [the phrase slop for pf (default for pf2/pf3)](https://lucene.apache.org/solr/guide/6_6/the-dismax-query-parser.html#TheDisMaxQueryParser-Theps_PhraseSlop_Parameter)
+* `pf2` (string) - [the bigram phrase fields](https://lucene.apache.org/solr/guide/6_6/the-extended-dismax-query-parser.html#TheExtendedDisMaxQueryParser-Thepf2Parameter)
+* `ps2` (string) - [the phrase slop for pf2](https://lucene.apache.org/solr/guide/6_6/the-extended-dismax-query-parser.html#TheExtendedDisMaxQueryParser-Theps2Parameter)
+* `pf3` (string) - [the trigram phrase fields](https://lucene.apache.org/solr/guide/6_6/the-extended-dismax-query-parser.html#TheExtendedDisMaxQueryParser-Theps3Parameter)
+* `ps3` (string) - [the phrase slop for pf3](https://lucene.apache.org/solr/guide/6_6/the-extended-dismax-query-parser.html#TheExtendedDisMaxQueryParser-Theps3Parameter)
+* `phrase.tie` (float) - A tie breaker that is used when aggregating pf,pf2,pf3 queries. Defaults to the value of `tie`
 
 To fine tune or debug your query, use the following extra arguments:
 
@@ -146,6 +153,8 @@ The bmax query parser utilizes the `edismax` query parser to build it's query. I
 * `bq` – the boost query (additive)
 * `bf` – boost functions (additive)
 * `boost` – boost functions (multiplicative)
+* `pf,ps,pf2,ps2,pf3,ps3` – phrase boosts (additive). Note that the scores from these boosts are added up per type (pf,pf2,pf3) and field but dismax'ed between types and fields.
+    Set `phrase.tie=1.0` if you want the standard edismax behaviour and also add up the scores between fields and types.
 
 Rerank queries are realized through the default Solr rerank postfilter. Query parsing
 is done in 3 steps:
