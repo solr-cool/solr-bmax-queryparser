@@ -2,14 +2,8 @@ package com.s24.search.solr.query.bmax;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.Map.Entry;
-import java.util.Optional;
 import java.util.stream.Collectors;
 
 import org.apache.lucene.analysis.Analyzer;
@@ -329,7 +323,7 @@ public class BmaxLuceneQueryBuilder {
                   // map bi-gram/tri-gram strings to phrase queries
                   final List<Query> nGramQueries = shinglesN.stream()
                           .map(nGram ->  queryBuilder.createPhraseQuery(fieldname, nGram, slop))
-                          .filter(q -> q != null)
+                          .filter(Objects::nonNull)
                           .collect(Collectors.toList());
 
                   switch (nGramQueries.size()) {
@@ -366,7 +360,7 @@ public class BmaxLuceneQueryBuilder {
       return Optional.empty();
    }
 
-   public static Query withBoostFactor(final Query query, float boostFactor) {
+   private static Query withBoostFactor(final Query query, float boostFactor) {
       return boostFactor == 1f ? query : new BoostQuery(query, boostFactor);
    }
 
