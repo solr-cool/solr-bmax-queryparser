@@ -1,6 +1,7 @@
 package com.s24.search.solr.component;
 
 import static com.google.common.base.Preconditions.checkNotNull;
+import static com.s24.search.solr.component.BmaxBoostConstants.*;
 
 import java.io.IOException;
 import java.util.Collection;
@@ -10,6 +11,7 @@ import java.util.Map.Entry;
 
 import org.apache.commons.lang.StringUtils;
 import org.apache.lucene.analysis.Analyzer;
+import org.apache.solr.common.SolrException;
 import org.apache.solr.common.params.CommonParams;
 import org.apache.solr.common.params.DisMaxParams;
 import org.apache.solr.common.params.ModifiableSolrParams;
@@ -19,6 +21,7 @@ import org.apache.solr.common.util.NamedList;
 import org.apache.solr.handler.component.ResponseBuilder;
 import org.apache.solr.handler.component.SearchComponent;
 import org.apache.solr.request.SolrQueryRequest;
+import org.apache.solr.schema.IndexSchema;
 import org.apache.solr.search.ReRankQParserPlugin;
 import org.apache.solr.util.SolrPluginUtils;
 
@@ -37,20 +40,6 @@ import com.s24.search.solr.util.BmaxDebugInfo;
  * @author Shopping24 GmbH, Torsten Bøgh Köster (@tboeghk)
  */
 public class BmaxBoostTermComponent extends SearchComponent {
-
-   public static final String COMPONENT_NAME = "bmax.booster";
-
-   // params
-   private static final String PENALIZE_EXTRA_TERMS = COMPONENT_NAME + ".penalize.extra";
-   private static final String PENALIZE_DOC_COUNT = COMPONENT_NAME + ".penalize.docs";
-   private static final String PENALIZE_FACTOR = COMPONENT_NAME + ".penalize.factor";
-   private static final String PENALIZE_ENABLE = COMPONENT_NAME + ".penalize";
-   private static final String PENALIZE_FIELDS = COMPONENT_NAME + ".penalize.qf";
-   private static final String BOOST_EXTRA_TERMS = COMPONENT_NAME + ".boost.extra";
-   private static final String BOOST_ENABLE = COMPONENT_NAME + ".boost";
-   private static final String BOOST_FACTOR = COMPONENT_NAME + ".boost.factor";
-   private static final String BOOST_FIELDS = COMPONENT_NAME + ".boost.qf";
-   private static final String SYNONYM_ENABLE = COMPONENT_NAME + ".synonyms";
 
    // (optional) synonym field
    private String synonymFieldType;
@@ -105,37 +94,29 @@ public class BmaxBoostTermComponent extends SearchComponent {
       checkNotNull(rb, "Pre-condition violated: rb must not be null.");
 
       // collect configuration
-      String q = rb.req.getParams().get(CommonParams.Q);
-      boolean boost = rb.req.getParams().getBool(BOOST_ENABLE, true);
-      String boostExtraTerms = rb.req.getParams().get(BOOST_EXTRA_TERMS);
-      float boostFactor = Math.abs(rb.req.getParams().getFloat(BOOST_FACTOR, 1f));
-      boolean penalize = rb.req.getParams().getBool(PENALIZE_ENABLE, true);
-      float penalizeFactor = -Math.abs(rb.req.getParams().getFloat(PENALIZE_FACTOR, 100.0f));
-      int penalizeDocs = rb.req.getParams().getInt(PENALIZE_DOC_COUNT, 400);
-      String penalizeExtraTerms = rb.req.getParams().get(PENALIZE_EXTRA_TERMS);
-      boolean synonyms = rb.req.getParams().getBool(SYNONYM_ENABLE, true);
+      final SolrParams requestParams = rb.req.getParams();
+      boolean boost = requestParams.getBool(BOOST_ENABLE, true);
+      String boostExtraTerms = requestParams.get(BOOST_EXTRA_TERMS);
+      float boostFactor = Math.abs(requestParams.getFloat(BOOST_FACTOR, 1f));
+      boolean penalize = requestParams.getBool(PENALIZE_ENABLE, true);
+      float penalizeFactor = -Math.abs(requestParams.getFloat(PENALIZE_FACTOR, 100.0f));
+      int penalizeDocs = requestParams.getInt(PENALIZE_DOC_COUNT, 400);
+      String penalizeExtraTerms = requestParams.get(PENALIZE_EXTRA_TERMS);
+      String penalizeStrategy = requestParams.get(PENALIZE_STRATEGY, VALUE_PENALIZE_STRATEGY_RERANK);
 
       // collect analyzers
-      Analyzer queryParsingAnalyzer = rb.req.getSearcher().getSchema()
-            .getFieldTypeByName(queryParsingFieldType).getQueryAnalyzer();
-      Analyzer synonymAnalyzer = rb.req.getSearcher().getSchema()
-            .getFieldTypeByName(synonymFieldType).getQueryAnalyzer();
-      Analyzer boostAnalyzer = rb.req.getSearcher().getSchema()
-            .getFieldTypeByName(boostTermFieldType).getQueryAnalyzer();
-      Analyzer penalizeAnalyzer = rb.req.getSearcher().getSchema()
-            .getFieldTypeByName(penalizeTermFieldType).getQueryAnalyzer();
-      ModifiableSolrParams params = new ModifiableSolrParams(rb.req.getParams());
+      final IndexSchema schema = rb.req.getSearcher().getSchema();
 
-      // do a first query parsing approach
-      q = Joiner.on(' ').skipNulls().join(Terms.collect(q, queryParsingAnalyzer));
+      final ModifiableSolrParams params = new ModifiableSolrParams(requestParams);
 
-      // collect synonyms
-      if (synonyms) {
-         q += " " + Joiner.on(' ').skipNulls().join(Terms.collect(q, synonymAnalyzer));
-      }
+      final String q = getExpandedQuery(requestParams, schema, requestParams.getBool(SYNONYM_ENABLE, true));
+
+      final boolean hasIncomingBoostQuery = requestParams.get(DisMaxParams.BQ) != null;
 
       // check boosts
-      if (boost && rb.req.getParams().get("bq") == null) {
+      if (boost && !hasIncomingBoostQuery) {
+
+         final Analyzer boostAnalyzer = schema.getFieldTypeByName(boostTermFieldType).getQueryAnalyzer();
          Collection<CharSequence> terms = Terms.collect(q, boostAnalyzer);
 
          // add extra terms
@@ -146,7 +127,7 @@ public class BmaxBoostTermComponent extends SearchComponent {
          // add boosts
          if (!terms.isEmpty()) {
             params.add("bq", String.format(Locale.US, "{!%s qf='%s' mm=1 bq=''} %s", boostQueryType,
-                  rb.req.getParams().get(BOOST_FIELDS, computeFactorizedQueryFields(rb.req, boostFactor)),
+                  requestParams.get(BOOST_FIELDS, computeFactorizedQueryFields(rb.req, boostFactor)),
                   Joiner.on(' ').join(terms)));
 
             // add debug
@@ -157,56 +138,72 @@ public class BmaxBoostTermComponent extends SearchComponent {
       }
 
       // check penalizes
-      if (penalize && rb.req.getParams().get("rq") == null) {
-         Collection<CharSequence> terms = Terms.collect(q, penalizeAnalyzer);
+      if (penalize) {
 
-         // add extra terms
-         if (penalizeExtraTerms != null) {
-            terms.addAll(Sets.newHashSet(Splitter.on(',').omitEmptyStrings().split(penalizeExtraTerms)));
-         }
+         // query fields for penalize terms
+         final String fields = requestParams.get(PENALIZE_FIELDS, requestParams.get(DisMaxParams.QF));
+         final Analyzer penalizeAnalyzer = schema.getFieldTypeByName(penalizeTermFieldType).getQueryAnalyzer();
 
-         // add boosts
-         if (!terms.isEmpty()) {
-            params.add("rq", String.format(Locale.US, "{!rerank reRankQuery=$rqq reRankDocs=%s reRankWeight=%.1f}",
-                  penalizeDocs, penalizeFactor));
+         PenalizeStrategy strategy = null;
 
-            // join terms once. save cpu.
-            String joinedTerms = Joiner.on(" OR ").join(terms);
+         if (penalizeStrategy.equals(VALUE_PENALIZE_STRATEGY_RERANK)) {
 
-            // iterate query fields
-            String fields = rb.req.getParams().get(
-                  PENALIZE_FIELDS, 
-                  rb.req.getParams().get(DisMaxParams.QF));
-            StringBuilder rerank = new StringBuilder();
-            Map<String, Float> queryFields = SolrPluginUtils.parseFieldBoosts(fields);
-            for (Entry<String, Float> field : queryFields.entrySet()) {
-               if (rerank.length() > 0) {
-                  rerank.append(" OR ");
-               }
-
-               rerank.append(field.getKey());
-               rerank.append(":(");
-               rerank.append(joinedTerms);
-               rerank.append(')');
+            if (requestParams.get(CommonParams.RQ) == null) {
+               strategy = new RerankPenalizeStrategy(rb, q, penalizeExtraTerms, penalizeAnalyzer, fields, penalizeDocs,
+                       penalizeFactor);
             }
 
-            // append rerank query
-            params.add("rqq", rerank.toString());
+         } else if (penalizeStrategy.equals(VALUE_PENALIZE_STRATEGY_BOOST_QUERY)) {
 
-            // add debug
-            if (rb.isDebugQuery()) {
-               BmaxDebugInfo.add(rb, COMPONENT_NAME + ".penalize.terms", Joiner.on(' ').join(terms));
+            if (!hasIncomingBoostQuery) {
+               strategy = new BoostQueryPenalizeStrategy(rb, q, penalizeExtraTerms, penalizeAnalyzer, fields,
+                       penalizeFactor);
             }
+
+         } else {
+            throw new SolrException(SolrException.ErrorCode.BAD_REQUEST,
+                    "Unknown value '" + penalizeStrategy + "' for param : " + PENALIZE_STRATEGY);
          }
+
+         if (strategy != null) {
+            strategy.apply(params);
+         }
+
       }
 
       rb.req.setParams(params);
    }
 
    /**
+    * Join the query terms and their synonym terms into a single query string
+    * @param requestParams
+    * @param schema
+    * @param synonyms
+    * @return
+    */
+   protected String getExpandedQuery(final SolrParams requestParams, final IndexSchema schema, boolean synonyms) {
+
+      String q = requestParams.get(CommonParams.Q);
+
+      final Analyzer queryParsingAnalyzer = schema.getFieldTypeByName(queryParsingFieldType).getQueryAnalyzer();
+
+      // do a first query parsing approach
+      q = Joiner.on(' ').skipNulls().join(Terms.collect(q, queryParsingAnalyzer));
+
+      // collect synonyms
+      if (synonyms) {
+         final Analyzer synonymAnalyzer = schema.getFieldTypeByName(synonymFieldType).getQueryAnalyzer();
+         q += " " + Joiner.on(' ').skipNulls().join(Terms.collect(q, synonymAnalyzer));
+      }
+
+      return q;
+   }
+
+   /**
     * Computes
     */
    protected String computeFactorizedQueryFields(SolrQueryRequest request, float factor) {
+
       checkNotNull(request, "Pre-condition violated: request must not be null.");
 
       StringBuilder qf = new StringBuilder();
