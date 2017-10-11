@@ -2,6 +2,9 @@ package com.s24.search.solr.query.bmax;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map.Entry;
 
@@ -15,6 +18,7 @@ import org.apache.solr.handler.component.ResponseBuilder;
 import org.apache.solr.request.SolrQueryRequest;
 import org.apache.solr.request.SolrRequestInfo;
 import org.apache.solr.search.ExtendedDismaxQParser;
+import org.apache.solr.search.FieldParams;
 import org.apache.solr.search.SolrCache;
 import org.apache.solr.search.SyntaxError;
 import org.apache.solr.util.SolrPluginUtils;
@@ -44,6 +48,7 @@ public class BmaxQueryParser extends ExtendedDismaxQParser {
    public static final String PARAM_TIE = DisMaxParams.TIE;
    public static final String PARAM_INSPECT_TERMS = "bmax.inspect";
    public static final String PARAM_BUILD_INSPECT_TERMS = "bmax.inspect.build";
+   public static final String PARAM_PHRASE_BOOST_TIE = "phrase.tie";
 
    private static final String WILDCARD = "*:*";
 
@@ -193,7 +198,38 @@ public class BmaxQueryParser extends ExtendedDismaxQParser {
       query.setSynonymBoost(params.getFloat(PARAM_SYNONYM_BOOST, 0.1f));
       query.setSubtopicEnabled(params.getBool(PARAM_SUBTOPIC_ENABLE, true));
       query.setSubtopicBoost(params.getFloat(PARAM_SUBTOPIC_BOOST, 0.01f));
-      query.setTieBreakerMultiplier(params.getFloat(PARAM_TIE, 0.00f));
+
+      final float tieBreaker = params.getFloat(PARAM_TIE, 0.00f);
+      query.setTieBreakerMultiplier(tieBreaker);
+      query.setPhraseBoostTieBreaker(params.getFloat(PARAM_PHRASE_BOOST_TIE, tieBreaker));
+
+      // Phrase slop array
+      final int pslop[] = new int[4];
+      pslop[0] = params.getInt(DisMaxParams.PS, 0);
+      pslop[2] = params.getInt(DisMaxParams.PS2, pslop[0]);
+      pslop[3] = params.getInt(DisMaxParams.PS3, pslop[0]);
+
+      final List<FieldParams> phraseFields = SolrPluginUtils
+              .parseFieldBoostsAndSlop(params.getParams(DisMaxParams.PF), 0, pslop[0]);
+      final List<FieldParams> phraseFields2 = SolrPluginUtils
+              .parseFieldBoostsAndSlop(params.getParams(DisMaxParams.PF2), 2, pslop[2]);
+      final List<FieldParams> phraseFields3 = SolrPluginUtils
+              .parseFieldBoostsAndSlop(params.getParams(DisMaxParams.PF3), 3, pslop[3]);
+
+      final int numPhraseFields = phraseFields.size() + phraseFields2.size() + phraseFields3.size();
+
+
+      final List<FieldParams> allPhraseFields;
+      if (numPhraseFields == 0) {
+         allPhraseFields = Collections.emptyList();
+      } else {
+         allPhraseFields = new ArrayList<>(numPhraseFields);
+         allPhraseFields.addAll(phraseFields);
+         allPhraseFields.addAll(phraseFields2);
+         allPhraseFields.addAll(phraseFields3);
+      }
+      query.setAllPhraseFields(allPhraseFields);
+
       query.setInspectTerms(params.getBool(PARAM_INSPECT_TERMS, false));
       query.setBuildTermsInspectionCache(params.getBool(PARAM_BUILD_INSPECT_TERMS, false));
 
