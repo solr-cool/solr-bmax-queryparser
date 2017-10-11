@@ -281,9 +281,11 @@ public class BmaxLuceneQueryBuilder {
 
             final QueryBuilder queryBuilder = new QueryBuilder(schema.getQueryAnalyzer());
 
+            // memoization of phrase shingles
             final Map<Integer, List<String>> shingles = new HashMap<>(2);
             String queryStringAsPhrase = null;
 
+            // build phrase queries for the phrase query fields
             for (final FieldParams fieldParams : allPhraseFields) {
 
                final int n = fieldParams.getWordGrams();
@@ -291,7 +293,6 @@ public class BmaxLuceneQueryBuilder {
                final String fieldname = fieldParams.getField();
 
                if (n == 0) { // entire phrase
-
 
                   if (queryStringAsPhrase == null) {
                      // We don't have the entire query string as a phrase yet
@@ -312,10 +313,7 @@ public class BmaxLuceneQueryBuilder {
                      final List<String> newShingles = new LinkedList<>();
 
                      for (int i = 0, lenI = terms.size() - nGramSize + 1; i < lenI; i++) {
-
-
                         final StringBuilder sb = new StringBuilder();
-
                         for (int j = i, lenJ = j + n; j < lenJ; j++) {
                            if (sb.length() > 0) {
                               sb.append(' ');
@@ -334,13 +332,11 @@ public class BmaxLuceneQueryBuilder {
                           .filter(q -> q != null)
                           .collect(Collectors.toList());
 
-
                   switch (nGramQueries.size()) {
                      case 0: break;
                      case 1: {
                         disjuncts.add(withBoostFactor(nGramQueries.get(0), fieldParams.getBoost()));
                         break;
-
                      }
                      default:
                         // If we have > 1 n-gram phrase for this field, aggregate their scores using
@@ -365,8 +361,6 @@ public class BmaxLuceneQueryBuilder {
                   return Optional.of(new DisjunctionMaxQuery(disjuncts, bmaxquery.getPhraseBoostTieBreaker()));
             }
          }
-
-
       }
 
       return Optional.empty();
