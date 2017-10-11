@@ -2,14 +2,8 @@ package com.s24.search.solr.query.bmax;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.Map.Entry;
-import java.util.Optional;
 import java.util.stream.Collectors;
 
 import org.apache.lucene.analysis.Analyzer;
@@ -281,80 +275,43 @@ public class BmaxLuceneQueryBuilder {
 
             final QueryBuilder queryBuilder = new QueryBuilder(schema.getQueryAnalyzer());
 
+            // memoization of phrase shingles
             final Map<Integer, List<String>> shingles = new HashMap<>(2);
-            String queryStringAsPhrase = null;
 
+            // build phrase queries for the phrase query fields
             for (final FieldParams fieldParams : allPhraseFields) {
 
-               final int n = fieldParams.getWordGrams();
+               final int phraseLength = fieldParams.getWordGrams();
                final int slop = fieldParams.getSlop();
                final String fieldname = fieldParams.getField();
 
-               if (n == 0) { // entire phrase
+               // get/create field-independent bi-gram or tri-gram strings
+               final List<String> shinglesN = shingles.computeIfAbsent(phraseLength, n -> buildNGrams(terms, n));
 
+               // map bi-gram/tri-gram strings to phrase queries
+               final List<Query> nGramQueries = shinglesN.stream()
+                       .map(nGram ->  queryBuilder.createPhraseQuery(fieldname, nGram, slop))
+                       .filter(Objects::nonNull)
+                       .collect(Collectors.toList());
 
-                  if (queryStringAsPhrase == null) {
-                     // We don't have the entire query string as a phrase yet
-                     // (= this is the first field in the allPhraseFields loop)
-                     queryStringAsPhrase = terms.stream().collect(Collectors.joining(" "));
-
+               switch (nGramQueries.size()) {
+                  case 0: break;
+                  case 1: {
+                     disjuncts.add(withBoostFactor(nGramQueries.get(0), fieldParams.getBoost()));
+                     break;
                   }
-                  final Query pq = queryBuilder.createPhraseQuery(fieldname, queryStringAsPhrase, slop);
-                  if (pq != null) {
-                     disjuncts.add(withBoostFactor(pq, fieldParams.getBoost()));
-                  }
+                  default:
+                     // If we have > 1 n-gram phrase for this field, aggregate their scores using
+                     // a BooleanQuery with all clauses being optional
+                     final BooleanQuery.Builder builder = new BooleanQuery.Builder();
+                     builder.setDisableCoord(true);
+                     builder.setMinimumNumberShouldMatch(1);
 
-               } else if (n <= terms.size()) { // pf2 or pf3
-
-                  // get/create field-independent bi-gram or tri-gram strings
-                  final List<String> shinglesN = shingles.computeIfAbsent(n, nGramSize -> {
-
-                     final List<String> newShingles = new LinkedList<>();
-
-                     for (int i = 0, lenI = terms.size() - nGramSize + 1; i < lenI; i++) {
-
-
-                        final StringBuilder sb = new StringBuilder();
-
-                        for (int j = i, lenJ = j + n; j < lenJ; j++) {
-                           if (sb.length() > 0) {
-                              sb.append(' ');
-                           }
-                           sb.append(terms.get(j));
-                        }
-                        newShingles.add(sb.toString());
+                     for (final Query nGramQuery : nGramQueries) {
+                        builder.add(nGramQuery, BooleanClause.Occur.SHOULD);
                      }
 
-                     return newShingles;
-                  });
-
-                  // map bi-gram/tri-gram strings to phrase queries
-                  final List<Query> nGramQueries = shinglesN.stream()
-                          .map(nGram ->  queryBuilder.createPhraseQuery(fieldname, nGram, slop))
-                          .filter(q -> q != null)
-                          .collect(Collectors.toList());
-
-
-                  switch (nGramQueries.size()) {
-                     case 0: break;
-                     case 1: {
-                        disjuncts.add(withBoostFactor(nGramQueries.get(0), fieldParams.getBoost()));
-                        break;
-
-                     }
-                     default:
-                        // If we have > 1 n-gram phrase for this field, aggregate their scores using
-                        // a BooleanQuery with all clauses being optional
-                        final BooleanQuery.Builder builder = new BooleanQuery.Builder();
-                        builder.setDisableCoord(true);
-                        builder.setMinimumNumberShouldMatch(1);
-
-                        for (final Query nGramQuery : nGramQueries) {
-                           builder.add(nGramQuery, BooleanClause.Occur.SHOULD);
-                        }
-
-                        disjuncts.add(withBoostFactor(builder.build(), fieldParams.getBoost()));
-                  }
+                     disjuncts.add(withBoostFactor(builder.build(), fieldParams.getBoost()));
                }
             }
 
@@ -365,14 +322,38 @@ public class BmaxLuceneQueryBuilder {
                   return Optional.of(new DisjunctionMaxQuery(disjuncts, bmaxquery.getPhraseBoostTieBreaker()));
             }
          }
-
-
       }
 
       return Optional.empty();
    }
 
-   public static Query withBoostFactor(final Query query, float boostFactor) {
+   /**
+    * Concatenate the terms to n-grams of the given length. For {@code nGramSize == 0}, the result will be a single
+    * string which is the concatenation of all terms.
+    */
+   private static List<String> buildNGrams(List<CharSequence> terms, int nGramSize) {
+      if (nGramSize == 0) { // all terms as a phrase
+         return Collections.singletonList(terms.stream().collect(Collectors.joining(" ")));
+      } else if (nGramSize <= terms.size()){
+         final List<String> newShingles = new LinkedList<>();
+
+         for (int i = 0, lenI = terms.size() - nGramSize + 1; i < lenI; i++) {
+            final StringBuilder sb = new StringBuilder();
+            for (int j = i, lenJ = j + nGramSize; j < lenJ; j++) {
+               if (sb.length() > 0) {
+                  sb.append(' ');
+               }
+               sb.append(terms.get(j));
+            }
+            newShingles.add(sb.toString());
+         }
+
+         return newShingles;
+      }
+      return Collections.emptyList();
+   }
+
+   private static Query withBoostFactor(final Query query, float boostFactor) {
       return boostFactor == 1f ? query : new BoostQuery(query, boostFactor);
    }
 
