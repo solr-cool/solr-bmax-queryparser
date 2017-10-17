@@ -85,7 +85,7 @@ public class FloatCachingValueSource extends ValueSource {
 
       return new FloatDocValues(this) {
          @Override
-         public float floatVal(int doc) {
+         public float floatVal(int doc) throws IOException {
             if (isValidAtomicReaderContext(readerContext)) {
                if (!isCached(doc)) {
                   cache.setFloat(doc, sourceValues.floatVal(doc));
