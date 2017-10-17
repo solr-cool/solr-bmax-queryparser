@@ -1,22 +1,9 @@
 package com.s24.search.solr.query.bmax;
 
-import static com.google.common.base.Preconditions.checkNotNull;
-
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.index.Term;
-import org.apache.lucene.queries.TermsQuery;
-import org.apache.lucene.search.BooleanClause;
-import org.apache.lucene.search.BooleanQuery;
-import org.apache.lucene.search.BoostQuery;
-import org.apache.lucene.search.DisjunctionMaxQuery;
-import org.apache.lucene.search.MatchAllDocsQuery;
-import org.apache.lucene.search.Query;
+import org.apache.lucene.search.*;
+import org.apache.lucene.util.BytesRef;
 import org.apache.solr.common.params.DisMaxParams;
 import org.apache.solr.common.params.SolrParams;
 import org.apache.solr.request.SolrQueryRequest;
@@ -24,6 +11,10 @@ import org.apache.solr.search.QParser;
 import org.apache.solr.search.SolrCache;
 import org.apache.solr.search.SyntaxError;
 import org.apache.solr.util.SolrPluginUtils;
+
+import java.util.*;
+
+import static com.google.common.base.Preconditions.checkNotNull;
 
 /**
  * A very basic dismax query parser which inspects the search terms to avoid creating query clauses for terms that are
@@ -113,14 +104,14 @@ public class TermInspectingDismaxQParser extends QParser {
          fieldTerms = fieldTermCache.get(field);
       }
 
-      Set<Term> filteredTerms = new HashSet<>();
+      Set<BytesRef> filteredTerms = new HashSet<>();
       
       if (fieldTerms != null) {
          // Add a term query to the result unless we have a field terms dictionary and we know, based on that
          // dictionary, that the term does not occur in the field
          for (Term term : terms) {
             if (fieldTerms.fieldMayContainTerm(term.text())) {
-               filteredTerms.add(term);
+               filteredTerms.add(term.bytes());
             }
          }
       }
@@ -129,7 +120,7 @@ public class TermInspectingDismaxQParser extends QParser {
          return null;
       }
 
-      Query termsQuery = new TermsQuery(filteredTerms);
+      Query termsQuery = new TermInSetQuery(field, filteredTerms);
       Float boostValue = config.queryFields.get(field);
 
       return boostValue != null

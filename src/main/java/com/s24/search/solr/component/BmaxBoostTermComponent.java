@@ -238,9 +238,4 @@ public class BmaxBoostTermComponent extends SearchComponent {
       return "Adds boost and penalize terms to a query";
    }
 
-   @Override
-   public String getSource() {
-      return "https://github.com/shopping24/solr-bmax-queryparser";
-   }
-
 }

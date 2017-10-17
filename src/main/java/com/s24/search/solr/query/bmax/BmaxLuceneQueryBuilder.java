@@ -1,6 +1,7 @@
 package com.s24.search.solr.query.bmax;
 
 import static com.google.common.base.Preconditions.checkNotNull;
+import static java.util.Optional.empty;
 
 import java.util.*;
 import java.util.Map.Entry;
@@ -8,18 +9,13 @@ import java.util.stream.Collectors;
 
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.index.Term;
-import org.apache.lucene.queries.TermsQuery;
 import org.apache.lucene.queries.function.BoostedQuery;
 import org.apache.lucene.queries.function.ValueSource;
 import org.apache.lucene.queries.function.valuesource.ProductFloatFunction;
-import org.apache.lucene.search.BooleanClause;
+import org.apache.lucene.search.*;
 import org.apache.lucene.search.BooleanClause.Occur;
-import org.apache.lucene.search.BooleanQuery;
 import org.apache.lucene.search.BooleanQuery.Builder;
-import org.apache.lucene.search.BoostQuery;
-import org.apache.lucene.search.DisjunctionMaxQuery;
-import org.apache.lucene.search.MatchAllDocsQuery;
-import org.apache.lucene.search.Query;
+import org.apache.lucene.util.BytesRef;
 import org.apache.lucene.util.QueryBuilder;
 import org.apache.solr.schema.IndexSchema;
 import org.apache.solr.search.FieldParams;
@@ -119,7 +115,6 @@ public class BmaxLuceneQueryBuilder {
       }
 
       Builder bq = new Builder();
-      bq.setDisableCoord(true);
 
       // iterate terms
       for (BmaxTerm term : bmaxquery.getTerms()) {
@@ -166,7 +161,7 @@ public class BmaxLuceneQueryBuilder {
          Analyzer analyzer = schema.getField(field.getKey()).getType().getQueryAnalyzer();
 
          // add main term clause
-         Query queries = buildTermQueries(field.getKey(), field.getValue().floatValue(),
+         Query queries = buildTermQueries(field.getKey(), field.getValue(),
                Terms.collectTerms(term.getTerm(), analyzer, field.getKey()),
                USER_QUERY_FIELD_BOOST);
          if (queries != null) {
@@ -176,7 +171,7 @@ public class BmaxLuceneQueryBuilder {
          // add synonym clause
          if (!term.getSynonyms().isEmpty()) {
             for (CharSequence synonym : term.getSynonyms()) {
-               Query termQueries = buildTermQueries(field.getKey(), field.getValue().floatValue(),
+               Query termQueries = buildTermQueries(field.getKey(), field.getValue(),
                      Terms.collectTerms(synonym, analyzer, field.getKey()),
                      bmaxquery.getSynonymBoost());
                if (termQueries != null) {
@@ -197,7 +192,7 @@ public class BmaxLuceneQueryBuilder {
 
             // add subtopic clause
             for (CharSequence subtopic : term.getSubtopics()) {
-               Query termQueries = buildTermQueries(field.getKey(), field.getValue().floatValue(),
+               Query termQueries = buildTermQueries(field.getKey(), field.getValue(),
                      Terms.collectTerms(subtopic, analyzer, field.getKey()),
                      bmaxquery.getSubtopicBoost());
                if (termQueries != null) {
@@ -229,26 +224,26 @@ public class BmaxLuceneQueryBuilder {
          fieldTerms = fieldTermCache.get(field);
       }
 
-      Collection<Term> filteredTerms = new ArrayList<>();
+      Collection<BytesRef> filteredTerms = new ArrayList<>();
 
       for (Term term : terms) {
          // Add the term to the query if we don't have a cache, or if the cache
          // says that the field may contain the term
          if (fieldTerms == null || fieldTerms.fieldMayContainTerm(term.text())) {
-            filteredTerms.add(term);
+            filteredTerms.add(term.bytes());
          }
       }
 
-      return filteredTerms.isEmpty() ? null : buildTermQuery(filteredTerms, fieldBoost * extraBoost);
+      return filteredTerms.isEmpty() ? null : buildTermQuery(field, filteredTerms, fieldBoost * extraBoost);
    }
 
    /**
     * Builds a term query and manipulates the document frequency, if given.
     */
-   protected Query buildTermQuery(Collection<Term> terms, float boost) {
+   protected Query buildTermQuery(String field, Collection<BytesRef> terms, float boost) {
       checkNotNull(terms, "Pre-condition violated: term must not be null.");
 
-      Query termsquery = new TermsQuery(terms);
+      Query termsquery = new TermInSetQuery(field, terms);
       queryClauseCount++;
 
       // set boost
@@ -264,7 +259,7 @@ public class BmaxLuceneQueryBuilder {
       // sloppy phrase queries for proximity
       final List<FieldParams> allPhraseFields = bmaxquery.getAllPhraseFields();
 
-      if (allPhraseFields.size() > 0) {
+      if (!allPhraseFields.isEmpty()) {
 
          final List<BmaxTerm> bmaxTerms = bmaxquery.getTerms();
 
@@ -303,9 +298,8 @@ public class BmaxLuceneQueryBuilder {
                   default:
                      // If we have > 1 n-gram phrase for this field, aggregate their scores using
                      // a BooleanQuery with all clauses being optional
-                     final BooleanQuery.Builder builder = new BooleanQuery.Builder();
-                     builder.setDisableCoord(true);
-                     builder.setMinimumNumberShouldMatch(1);
+                     final BooleanQuery.Builder builder = new BooleanQuery.Builder()
+                             .setMinimumNumberShouldMatch(1);
 
                      for (final Query nGramQuery : nGramQueries) {
                         builder.add(nGramQuery, BooleanClause.Occur.SHOULD);
@@ -324,7 +318,7 @@ public class BmaxLuceneQueryBuilder {
          }
       }
 
-      return Optional.empty();
+      return empty();
    }
 
    /**
