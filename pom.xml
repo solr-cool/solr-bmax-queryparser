@@ -270,8 +270,6 @@
                                 </goals>
                                 <configuration>
                                     <executable>gpg2</executable>
-                                    <keyname>${gpg.keyname}</keyname>
-                                    <passphraseServerId>${gpg.keyname}</passphraseServerId>
                                 </configuration>
                             </execution>
                         </executions>
