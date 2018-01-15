@@ -1,29 +1,32 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 
 <config>
-    <luceneMatchVersion>6.2.1</luceneMatchVersion>
-    <directoryFactory name="DirectoryFactory" class="solr.RAMDirectoryFactory" />
+    <luceneMatchVersion>7.2.0</luceneMatchVersion>
+
+    <indexConfig>
+        <!-- Needed for RAMDirectoryFactory -->
+        <lockType>single</lockType>
+    </indexConfig>
+
     <dataDir>${solr.core0.data.dir:}</dataDir>
-    <schemaFactory class="ClassicIndexSchemaFactory" />
-    <updateHandler class="solr.DirectUpdateHandler2" />
-    <requestDispatcher handleSelect="false">
-        <requestParsers enableRemoteStreaming="false"
-            multipartUploadLimitInKB="2048" formdataUploadLimitInKB="2048" />
-    </requestDispatcher>
+
+    <updateHandler class="solr.DirectUpdateHandler2"/>
+
     <requestHandler name="/select" class="solr.SearchHandler">
         <lst name="defaults">
             <str name="echoParams">all</str>
             <int name="rows">10</int>
             <str name="df">id</str>
-            
+
             <str name="defType">bmax</str>
         </lst>
+        <arr name="components">
+            <str>bmax.booster</str>
+            <str>query</str>
+        </arr>
     </requestHandler>
-    <requestHandler name="/analysis/field" startup="lazy"
-        class="solr.FieldAnalysisRequestHandler" />
-    <requestHandler name="/update" class="solr.UpdateRequestHandler" />
-    <requestHandler name="/admin/"
-        class="org.apache.solr.handler.admin.AdminHandlers" />
+
+    <requestHandler name="/update" class="solr.UpdateRequestHandler"/>
 
 
     <!-- bmax part -->
@@ -34,7 +37,15 @@
         <str name="boostUpFieldType">bmax_boostterms</str>
         <str name="boostDownFieldType">bmax_penalizeterms</str>
     </queryParser>
-    
+
+    <!-- adds derived boost queries -->
+    <searchComponent name="bmax.booster" class="com.s24.search.solr.component.BmaxBoostTermComponent">
+        <str name="queryParsingFieldType">bmax_query</str>
+        <str name="synonymFieldType">bmax_synonyms</str>
+        <str name="boostTermFieldType">bmax_boostterms</str>
+        <str name="penalizeTermFieldType">bmax_penalizeterms</str>
+    </searchComponent>
+
     <admin>
         <defaultQuery>solr</defaultQuery>
     </admin>
