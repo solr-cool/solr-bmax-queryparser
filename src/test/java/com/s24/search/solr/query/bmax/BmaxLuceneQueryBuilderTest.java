@@ -1,20 +1,8 @@
 package com.s24.search.solr.query.bmax;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertThat;
-import static org.junit.Assert.assertTrue;
-import static org.mockito.Mockito.when;
-
-import static com.s24.search.solr.query.bmax.AbstractLuceneQueryTest.*;
-
 import com.s24.search.solr.query.bmax.BmaxQuery.BmaxTerm;
-
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
-import org.apache.lucene.search.BooleanClause;
-import org.apache.lucene.search.BooleanQuery;
-import org.apache.lucene.search.DisjunctionMaxQuery;
-import org.apache.lucene.search.MatchAllDocsQuery;
-import org.apache.lucene.search.Query;
+import org.apache.lucene.search.*;
 import org.apache.solr.schema.FieldType;
 import org.apache.solr.schema.IndexSchema;
 import org.apache.solr.schema.SchemaField;
@@ -26,6 +14,11 @@ import org.mockito.Mockito;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
+
+import static com.s24.search.solr.query.bmax.AbstractLuceneQueryTest.*;
+import static org.hamcrest.CoreMatchers.instanceOf;
+import static org.junit.Assert.*;
+import static org.mockito.Mockito.when;
 
 public class BmaxLuceneQueryBuilderTest {
 
@@ -55,7 +48,25 @@ public class BmaxLuceneQueryBuilderTest {
             .build();
 
       assertEquals(new MatchAllDocsQuery(), buildedQuery);
+   }
 
+   @Test
+   public void testMatchNoDocsQueryForNoTerms() {
+      // given
+      BmaxQuery bmaxQuery = new BmaxQuery();
+
+
+      // when
+      Query result1 = new BmaxLuceneQueryBuilder(bmaxQuery)
+              .withNoMatchDocsForNoTermsQuery(true)
+              .build();
+
+      Query result2 = new BmaxLuceneQueryBuilder(bmaxQuery)
+              .build();
+
+      // then
+      assertThat(result1, instanceOf(MatchNoDocsQuery.class));
+      assertThat(result2, instanceOf(MatchAllDocsQuery.class));
    }
 
    @Test
