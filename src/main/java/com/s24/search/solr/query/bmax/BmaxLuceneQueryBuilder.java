@@ -1,12 +1,6 @@
 package com.s24.search.solr.query.bmax;
 
-import static com.google.common.base.Preconditions.checkNotNull;
-import static java.util.Optional.empty;
-
-import java.util.*;
-import java.util.Map.Entry;
-import java.util.stream.Collectors;
-
+import com.s24.search.solr.query.bmax.BmaxQuery.BmaxTerm;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.index.Term;
 import org.apache.lucene.queries.function.BoostedQuery;
@@ -21,7 +15,12 @@ import org.apache.solr.schema.IndexSchema;
 import org.apache.solr.search.FieldParams;
 import org.apache.solr.search.SolrCache;
 
-import com.s24.search.solr.query.bmax.BmaxQuery.BmaxTerm;
+import java.util.*;
+import java.util.Map.Entry;
+import java.util.stream.Collectors;
+
+import static com.google.common.base.Preconditions.checkNotNull;
+import static java.util.Optional.empty;
 
 /**
  * Builds the bmax dismax query
@@ -39,6 +38,7 @@ public class BmaxLuceneQueryBuilder {
    private IndexSchema schema;
    private SolrCache<String, FieldTermsDictionary> fieldTermCache;
    private int queryClauseCount = 0;
+   private boolean noMatchDocsForNoTermsQuery;
 
    public BmaxLuceneQueryBuilder(BmaxQuery bmaxQuery) {
       checkNotNull(bmaxQuery, "Pre-condition violated: bmaxQuery must not be null.");
@@ -83,6 +83,11 @@ public class BmaxLuceneQueryBuilder {
       return this;
    }
 
+   public BmaxLuceneQueryBuilder withNoMatchDocsForNoTermsQuery(boolean bool) {
+      this.noMatchDocsForNoTermsQuery = bool;
+      return this;
+   }
+
    // ---- go build yourself
 
    public Query build() {
@@ -111,6 +116,9 @@ public class BmaxLuceneQueryBuilder {
     */
    protected Query buildWrappingQuery() {
       if (bmaxquery.getTerms().isEmpty()) {
+         if (noMatchDocsForNoTermsQuery) {
+            return new MatchNoDocsQuery();
+         }
          return new MatchAllDocsQuery();
       }
 
@@ -298,11 +306,11 @@ public class BmaxLuceneQueryBuilder {
                   default:
                      // If we have > 1 n-gram phrase for this field, aggregate their scores using
                      // a BooleanQuery with all clauses being optional
-                     final BooleanQuery.Builder builder = new BooleanQuery.Builder()
+                     final Builder builder = new Builder()
                              .setMinimumNumberShouldMatch(1);
 
                      for (final Query nGramQuery : nGramQueries) {
-                        builder.add(nGramQuery, BooleanClause.Occur.SHOULD);
+                        builder.add(nGramQuery, Occur.SHOULD);
                      }
 
                      disjuncts.add(withBoostFactor(builder.build(), fieldParams.getBoost()));
@@ -350,6 +358,5 @@ public class BmaxLuceneQueryBuilder {
    private static Query withBoostFactor(final Query query, float boostFactor) {
       return boostFactor == 1f ? query : new BoostQuery(query, boostFactor);
    }
-
 
 }

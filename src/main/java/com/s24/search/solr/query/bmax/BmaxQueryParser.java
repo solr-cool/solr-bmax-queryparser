@@ -1,13 +1,14 @@
 package com.s24.search.solr.query.bmax;
 
-import static com.google.common.base.Preconditions.checkNotNull;
-
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map.Entry;
-
+import com.google.common.base.Joiner;
+import com.google.common.base.Predicate;
+import com.google.common.base.Predicates;
+import com.google.common.collect.Collections2;
+import com.google.common.collect.Iterables;
+import com.s24.search.solr.query.bmax.BmaxQuery.BmaxTerm;
+import com.s24.search.solr.util.BmaxDebugInfo;
+import eu.danieldk.dictomaton.DictionaryBuilder;
+import eu.danieldk.dictomaton.DictionaryBuilderException;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.index.TermsEnum;
 import org.apache.lucene.search.Query;
@@ -25,16 +26,13 @@ import org.apache.solr.util.SolrPluginUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.google.common.base.Joiner;
-import com.google.common.base.Predicate;
-import com.google.common.base.Predicates;
-import com.google.common.collect.Collections2;
-import com.google.common.collect.Iterables;
-import com.s24.search.solr.query.bmax.BmaxQuery.BmaxTerm;
-import com.s24.search.solr.util.BmaxDebugInfo;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map.Entry;
 
-import eu.danieldk.dictomaton.DictionaryBuilder;
-import eu.danieldk.dictomaton.DictionaryBuilderException;
+import static com.google.common.base.Preconditions.checkNotNull;
 
 public class BmaxQueryParser extends ExtendedDismaxQParser {
 
@@ -49,6 +47,7 @@ public class BmaxQueryParser extends ExtendedDismaxQParser {
    public static final String PARAM_INSPECT_TERMS = "bmax.inspect";
    public static final String PARAM_BUILD_INSPECT_TERMS = "bmax.inspect.build";
    public static final String PARAM_PHRASE_BOOST_TIE = "phrase.tie";
+   public static final String PARAM_ENABLE_MATCH_NO_DOCS_QUERY_FOR_NO_TERMS = "bmax.no.docs";
 
    private static final String WILDCARD = "*:*";
 
@@ -130,6 +129,7 @@ public class BmaxQueryParser extends ExtendedDismaxQParser {
             .withBoostQueries(getBoostQueries())
             .withSchema(getReq().getSchema())
             .withFieldTermCache(fieldTermCache)
+            .withNoMatchDocsForNoTermsQuery(params.getBool(PARAM_ENABLE_MATCH_NO_DOCS_QUERY_FOR_NO_TERMS, false))
             .build();
 
       // save debug stuff
