@@ -4,7 +4,7 @@
     <groupId>com.s24.search.solr</groupId>
     <artifactId>solr-bmax-queryparser</artifactId>
     <name>solr-bmax-queryparser</name>
-    <version>2.4.3-SNAPSHOT</version>
+    <version>2.4.3</version>
     <description>A synonym aware edismax query parser for Apache Solr</description>
     <url>https://github.com/shopping24/solr-bmax-queryparser</url>
     <licenses>
