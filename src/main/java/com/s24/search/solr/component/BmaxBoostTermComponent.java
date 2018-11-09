@@ -127,7 +127,7 @@ public class BmaxBoostTermComponent extends SearchComponent {
          // add boosts
          if (!terms.isEmpty()) {
             params.add("bq", String.format(Locale.US, "{!%s qf='%s' mm=1 bq=''} %s", boostQueryType,
-                  requestParams.get(BOOST_FIELDS, computeFactorizedQueryFields(rb.req, boostFactor)),
+                  requestParams.get(computeFactorizedQueryFields(rb.req, BOOST_FIELDS, boostFactor), computeFactorizedQueryFields(rb.req, DisMaxParams.QF, boostFactor)),
                   Joiner.on(' ').join(terms)));
 
             // add debug
@@ -202,14 +202,14 @@ public class BmaxBoostTermComponent extends SearchComponent {
    /**
     * Computes
     */
-   protected String computeFactorizedQueryFields(SolrQueryRequest request, float factor) {
+   protected String computeFactorizedQueryFields(SolrQueryRequest request, String field, float factor) {
 
       checkNotNull(request, "Pre-condition violated: request must not be null.");
 
       StringBuilder qf = new StringBuilder();
 
       // parse fields and boosts
-      Map<String, Float> fieldBoosts = SolrPluginUtils.parseFieldBoosts(request.getParams().getParams(DisMaxParams.QF));
+      Map<String, Float> fieldBoosts = SolrPluginUtils.parseFieldBoosts(request.getParams().getParams(field));
 
       // iterate, add factor and add to result qf
       for (Entry<String, Float> f : fieldBoosts.entrySet()) {
