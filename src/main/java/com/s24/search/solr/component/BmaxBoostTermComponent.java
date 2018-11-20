@@ -98,6 +98,7 @@ public class BmaxBoostTermComponent extends SearchComponent {
       boolean boost = requestParams.getBool(BOOST_ENABLE, true);
       String boostExtraTerms = requestParams.get(BOOST_EXTRA_TERMS);
       float boostFactor = Math.abs(requestParams.getFloat(BOOST_FACTOR, 1f));
+      String boostStrategy = requestParams.get(BOOST_STRATEGY, VALUE_BOOST_STRATEGY_ADDITIVELY);
       boolean penalize = requestParams.getBool(PENALIZE_ENABLE, true);
       float penalizeFactor = -Math.abs(requestParams.getFloat(PENALIZE_FACTOR, 100.0f));
       int penalizeDocs = requestParams.getInt(PENALIZE_DOC_COUNT, 400);
@@ -126,7 +127,7 @@ public class BmaxBoostTermComponent extends SearchComponent {
 
          // add boosts
          if (!terms.isEmpty()) {
-            params.add("bq", String.format(Locale.US, "{!%s qf='%s' mm=1 bq=''} %s", boostQueryType,
+            params.add(boostStrategy, String.format(Locale.US, "{!%s qf='%s' mm=1 bq=''} %s", boostQueryType,
                   computeFactorizedQueryFields(rb.req, boostFactor),
                   Joiner.on(' ').join(terms)));
 

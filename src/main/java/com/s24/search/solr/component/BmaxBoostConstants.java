@@ -18,6 +18,10 @@ public interface BmaxBoostConstants {
     String BOOST_ENABLE = COMPONENT_NAME + ".boost";
     String BOOST_FACTOR = COMPONENT_NAME + ".boost.factor";
     String BOOST_FIELDS = COMPONENT_NAME + ".boost.qf";
+    String BOOST_STRATEGY = COMPONENT_NAME + ".boost.strategy";
+    String VALUE_BOOST_STRATEGY_ADDITIVELY = "bq";
+    String VALUE_BOOST_STRATEGY_MULTIPLICATIVE = "boost";
+
     String SYNONYM_ENABLE = COMPONENT_NAME + ".synonyms";
 
 }
