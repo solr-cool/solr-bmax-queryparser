@@ -98,6 +98,7 @@ public class BmaxBoostTermComponent extends SearchComponent {
       boolean boost = requestParams.getBool(BOOST_ENABLE, true);
       String boostExtraTerms = requestParams.get(BOOST_EXTRA_TERMS);
       float boostFactor = Math.abs(requestParams.getFloat(BOOST_FACTOR, 1f));
+      String boostStrategy = requestParams.get(BOOST_STRATEGY, VALUE_BOOST_STRATEGY_ADDITIVELY);
       boolean penalize = requestParams.getBool(PENALIZE_ENABLE, true);
       float penalizeFactor = -Math.abs(requestParams.getFloat(PENALIZE_FACTOR, 100.0f));
       int penalizeDocs = requestParams.getInt(PENALIZE_DOC_COUNT, 400);
@@ -126,8 +127,8 @@ public class BmaxBoostTermComponent extends SearchComponent {
 
          // add boosts
          if (!terms.isEmpty()) {
-            params.add("bq", String.format(Locale.US, "{!%s qf='%s' mm=1 bq=''} %s", boostQueryType,
-                  requestParams.get(BOOST_FIELDS, computeFactorizedQueryFields(rb.req, boostFactor)),
+            params.add(boostStrategy, String.format(Locale.US, "{!%s qf='%s' mm=1 bq=''} %s", boostQueryType,
+                  computeFactorizedQueryFields(rb.req, boostFactor),
                   Joiner.on(' ').join(terms)));
 
             // add debug
@@ -203,13 +204,13 @@ public class BmaxBoostTermComponent extends SearchComponent {
     * Computes
     */
    protected String computeFactorizedQueryFields(SolrQueryRequest request, float factor) {
-
       checkNotNull(request, "Pre-condition violated: request must not be null.");
 
       StringBuilder qf = new StringBuilder();
 
+      String field = (request.getParams().get(BOOST_FIELDS) != null ? BOOST_FIELDS : DisMaxParams.QF);
       // parse fields and boosts
-      Map<String, Float> fieldBoosts = SolrPluginUtils.parseFieldBoosts(request.getParams().getParams(DisMaxParams.QF));
+      Map<String, Float> fieldBoosts = SolrPluginUtils.parseFieldBoosts(request.getParams().getParams(field));
 
       // iterate, add factor and add to result qf
       for (Entry<String, Float> f : fieldBoosts.entrySet()) {
