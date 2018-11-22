@@ -1,11 +1,6 @@
 package com.s24.search.solr.component;
 
-import static com.s24.search.solr.component.BmaxBoostConstants.BOOST_ENABLE;
-import static com.s24.search.solr.component.BmaxBoostConstants.PENALIZE_ENABLE;
-import static com.s24.search.solr.component.BmaxBoostConstants.PENALIZE_STRATEGY;
-import static com.s24.search.solr.component.BmaxBoostConstants.SYNONYM_ENABLE;
-import static com.s24.search.solr.component.BmaxBoostConstants.VALUE_PENALIZE_STRATEGY_BOOST_QUERY;
-import static com.s24.search.solr.component.BmaxBoostConstants.VALUE_PENALIZE_STRATEGY_RERANK;
+import static com.s24.search.solr.component.BmaxBoostConstants.*;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.verify;
@@ -63,6 +58,8 @@ public class BmaxBoostTermComponentTest {
         initArgs.add("synonymFieldType", "synonymFieldType");
         initArgs.add("boostTermFieldType", "boostTermFieldType");
         initArgs.add("penalizeTermFieldType", "penalizeTermFieldType");
+        initArgs.add("boostQueryType", "tidismax");
+        initArgs.add("penalizeQueryType", "tidismax");
     }
 
     @Test
@@ -111,13 +108,11 @@ public class BmaxBoostTermComponentTest {
 
         Assert.assertThat(argument.getValue().getParams("rq"),
                 CoreMatchers.equalTo(
-                        new String[] {"{!rerank reRankQuery=$rqq reRankDocs=400 reRankWeight=-100.000000}"}) );
+                        new String[] {"{!rerank reRankQuery=$rqq reRankDocs=400}"}) );
 
         // 'a' was removed from q as it is a stopword in StandardAnalyzer
         Assert.assertThat(argument.getValue().getParams("rqq"),
-                CoreMatchers.equalTo(new String[] {"field1:(b OR c) OR field2:(b OR c)"}) );
-
-
+                CoreMatchers.equalTo(new String[] {"{!tidismax qf='field1^-100.0 field2^-300.0 ' mm=1 bq=''} b c"}) );
     }
 
     @Test
@@ -129,6 +124,7 @@ public class BmaxBoostTermComponentTest {
         params.set("q", "a b c");
         params.set(PENALIZE_ENABLE, true);
         params.set(PENALIZE_STRATEGY, VALUE_PENALIZE_STRATEGY_BOOST_QUERY);
+        params.set(PENALIZE_FACTOR, 1000000);
         params.set(SYNONYM_ENABLE, false);
         params.set(BOOST_ENABLE, false);
         params.set(DisMaxParams.QF, "field1 field2^3");
@@ -140,7 +136,7 @@ public class BmaxBoostTermComponentTest {
         verify(request).setParams(argument.capture());
 
         Assert.assertThat(argument.getValue().getParams("bq"),
-                CoreMatchers.equalTo(new String[] {"(field1:(b OR c) OR field2:(b OR c))^-100.000000"}) );
+                CoreMatchers.equalTo(new String[] {"{!tidismax qf='field1^-1000000.0 field2^-3000000.0 ' mm=1 bq=''} b c"}) );
 
     }
 }

@@ -15,6 +15,7 @@ public interface BmaxBoostConstants {
     String VALUE_PENALIZE_STRATEGY_BOOST_QUERY = "bq";
 
     String BOOST_EXTRA_TERMS = COMPONENT_NAME + ".boost.extra";
+    String BOOST_DOC_COUNT = COMPONENT_NAME + ".boost.docs";
     String BOOST_ENABLE = COMPONENT_NAME + ".boost";
     String BOOST_FACTOR = COMPONENT_NAME + ".boost.factor";
     String BOOST_FIELDS = COMPONENT_NAME + ".boost.qf";

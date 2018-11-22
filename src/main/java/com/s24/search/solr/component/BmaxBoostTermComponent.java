@@ -4,15 +4,12 @@ import static com.google.common.base.Preconditions.checkNotNull;
 import static com.s24.search.solr.component.BmaxBoostConstants.*;
 
 import java.io.IOException;
-import java.util.Collection;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Map.Entry;
 
+import com.s24.search.solr.component.termstrategy.TermRankingStrategy;
+import com.s24.search.solr.component.termstrategy.TermRankingStrategyBuilder;
 import org.apache.commons.lang.StringUtils;
 import org.apache.logging.log4j.util.Strings;
 import org.apache.lucene.analysis.Analyzer;
-import org.apache.solr.common.SolrException;
 import org.apache.solr.common.params.CommonParams;
 import org.apache.solr.common.params.DisMaxParams;
 import org.apache.solr.common.params.ModifiableSolrParams;
@@ -23,11 +20,8 @@ import org.apache.solr.handler.component.ResponseBuilder;
 import org.apache.solr.handler.component.SearchComponent;
 import org.apache.solr.schema.IndexSchema;
 import org.apache.solr.search.ReRankQParserPlugin;
-import org.apache.solr.util.SolrPluginUtils;
 
 import com.google.common.base.Joiner;
-import com.google.common.base.Splitter;
-import com.google.common.collect.Sets;
 import com.s24.search.solr.query.bmax.Terms;
 import com.s24.search.solr.util.BmaxDebugInfo;
 
@@ -56,6 +50,9 @@ public class BmaxBoostTermComponent extends SearchComponent {
    // the defType for the boost query generated for the boost terms
    private String boostQueryType;
 
+   // the defType for the boost query generated for the boost terms
+   private String penalizeQueryType;
+
    @Override
    public void init(@SuppressWarnings("rawtypes") NamedList args) {
       super.init(args);
@@ -66,6 +63,7 @@ public class BmaxBoostTermComponent extends SearchComponent {
       boostTermFieldType = configuration.get("boostTermFieldType");
       penalizeTermFieldType = configuration.get("penalizeTermFieldType");
       boostQueryType = configuration.get("boostQueryType", "dismax");
+      penalizeQueryType = configuration.get("penalizeQueryType", "dismax");
    }
 
    @Override
@@ -111,7 +109,7 @@ public class BmaxBoostTermComponent extends SearchComponent {
 
       // check penalizes
       if (penalize) {
-         String debugMessage = applyPenalizing(params,schema,q,rb.isDebugQuery());
+         String debugMessage = applyPenalizing(params,schema,q);
          if(rb.isDebugQuery()) {
             BmaxDebugInfo.add(rb, COMPONENT_NAME + ".penalize.terms", debugMessage);
          }
@@ -131,53 +129,53 @@ public class BmaxBoostTermComponent extends SearchComponent {
       final String boostExtraTerms = params.get(BOOST_EXTRA_TERMS);
       final float boostFactor = Math.abs(params.getFloat(BOOST_FACTOR, 1f));
       final String boostStrategy = params.get(BOOST_STRATEGY, VALUE_BOOST_STRATEGY_ADDITIVELY);
-
+      final String queryFields = (params.get(BOOST_FIELDS) != null ? BOOST_FIELDS : DisMaxParams.QF);
       final Analyzer boostAnalyzer = schema.getFieldTypeByName(boostTermFieldType).getQueryAnalyzer();
-      Collection<CharSequence> terms = Terms.collect(q, boostAnalyzer);
+      final int boostDocCount = params.getInt(BOOST_DOC_COUNT, 400);
 
-      // add extra terms
-      if (boostExtraTerms != null) {
-         terms.addAll(Sets.newHashSet(Splitter.on(',').omitEmptyStrings().split(boostExtraTerms)));
+      TermRankingStrategyBuilder termRankingStrategyBuilder = new TermRankingStrategyBuilder();
+      switch(boostStrategy) {
+         case "bq": termRankingStrategyBuilder.additiveTermRankingStrategy(); break;
+         case "boost": termRankingStrategyBuilder.multiplicativeTermRankingStrategy(); break;
+         case "rq": termRankingStrategyBuilder.rerankTermRankingStrategy(boostDocCount); break;
       }
 
-      // add boosts
-      if (!terms.isEmpty()) {
-         params.add(boostStrategy, String.format(Locale.US, "{!%s qf='%s' mm=1 bq=''} %s", boostQueryType,
-                 computeFactorizedQueryFields(params, boostFactor),
-                 Joiner.on(' ').join(terms)));
-      }
-      return Joiner.on(' ').join(terms);
+      TermRankingStrategy strategy = termRankingStrategyBuilder
+              .forQuery(q)
+              .withAnalyzer(boostAnalyzer)
+              .withQueryField(queryFields)
+              .withExtraTerms(boostExtraTerms)
+              .withQueryType(boostQueryType)
+              .withFactor(boostFactor)
+              .build();
 
+      return strategy.apply(params);
    }
 
-   private String applyPenalizing(final ModifiableSolrParams params, final IndexSchema schema, String q, boolean debug) {
-      final float penalizeFactor = -Math.abs(params.getFloat(PENALIZE_FACTOR, 100.0f));
-      final int penalizeDocs = params.getInt(PENALIZE_DOC_COUNT, 400);
+   private String applyPenalizing(final ModifiableSolrParams params, final IndexSchema schema, String q) {
       final String penalizeExtraTerms = params.get(PENALIZE_EXTRA_TERMS);
+      final float penalizeFactor = Math.abs(params.getFloat(PENALIZE_FACTOR, 100.0f));
       final String penalizeStrategy = params.get(PENALIZE_STRATEGY, VALUE_PENALIZE_STRATEGY_RERANK);
-
-
-      // query fields for penalize terms
+      final String queryFields = (params.get(PENALIZE_FIELDS) != null ? PENALIZE_FIELDS : DisMaxParams.QF);
       final Analyzer penalizeAnalyzer = schema.getFieldTypeByName(penalizeTermFieldType).getQueryAnalyzer();
-      final String fields = params.get(PENALIZE_FIELDS, params.get(DisMaxParams.QF));
+      final int penalizeDocCount = params.getInt(PENALIZE_DOC_COUNT, 400);
 
-      PenalizeStrategy strategy = null;
-
-      if (penalizeStrategy.equals(VALUE_PENALIZE_STRATEGY_RERANK)) {
-
-         // there can only be one Rerankquery in solr (as of 22.11.18) , so we can only use RQ if it is empty
-         if (params.get(CommonParams.RQ) == null) {
-            strategy = new RerankPenalizeStrategy(q, penalizeExtraTerms, penalizeAnalyzer, fields, penalizeDocs,
-                    penalizeFactor);
-         }
-
-      } else if (penalizeStrategy.equals(VALUE_PENALIZE_STRATEGY_BOOST_QUERY)) {
-         strategy = new BoostQueryPenalizeStrategy(q, penalizeExtraTerms, penalizeAnalyzer, fields, penalizeFactor);
-
-      } else {
-         throw new SolrException(SolrException.ErrorCode.BAD_REQUEST,
-                 "Unknown value '" + penalizeStrategy + "' for param : " + PENALIZE_STRATEGY);
+      TermRankingStrategyBuilder termRankingStrategyBuilder = new TermRankingStrategyBuilder();
+      switch(penalizeStrategy) {
+         case "bq": termRankingStrategyBuilder.additiveTermRankingStrategy(); break;
+         case "boost": termRankingStrategyBuilder.multiplicativeTermRankingStrategy(); break;
+         case "rq": termRankingStrategyBuilder.rerankTermRankingStrategy(penalizeDocCount); break;
       }
+
+      TermRankingStrategy strategy = termRankingStrategyBuilder
+              .forQuery(q)
+              .withAnalyzer(penalizeAnalyzer)
+              .withQueryField(queryFields)
+              .withExtraTerms(penalizeExtraTerms)
+              .withQueryType(penalizeQueryType)
+              .withFactor(penalizeFactor)
+              .asPenalizer()
+              .build();
 
       if (strategy != null) {
          return strategy.apply(params);
@@ -208,35 +206,6 @@ public class BmaxBoostTermComponent extends SearchComponent {
       }
 
       return q;
-   }
-
-   /**
-    * Computes
-    */
-   protected String computeFactorizedQueryFields(SolrParams params, float factor) {
-      checkNotNull(params, "Pre-condition violated: params must not be null.");
-
-      StringBuilder qf = new StringBuilder();
-
-      String field = (params.get(BOOST_FIELDS) != null ? BOOST_FIELDS : DisMaxParams.QF);
-      // parse fields and boosts
-      Map<String, Float> fieldBoosts = SolrPluginUtils.parseFieldBoosts(params.getParams(field));
-
-      // iterate, add factor and add to result qf
-      for (Entry<String, Float> f : fieldBoosts.entrySet()) {
-         qf.append(f.getKey());
-         qf.append('^');
-
-         if (f.getValue() != null) {
-            qf.append(f.getValue() * factor);
-         } else {
-            qf.append(factor);
-         }
-
-         qf.append(' ');
-      }
-
-      return qf.toString();
    }
 
    @Override
