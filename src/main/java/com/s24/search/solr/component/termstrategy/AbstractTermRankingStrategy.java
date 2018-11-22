@@ -1,4 +1,4 @@
-package com.s24.search.solr.component;
+package com.s24.search.solr.component.termstrategy;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.Splitter;
@@ -76,48 +76,24 @@ public abstract class AbstractTermRankingStrategy implements TermRankingStrategy
         return qf.toString();
     }
 
-    public String getQ() {
-        return q;
-    }
-
     public void setQ(String q) {
         this.q = q;
-    }
-
-    public String getExtraTerms() {
-        return extraTerms;
     }
 
     public void setExtraTerms(String extraTerms) {
         this.extraTerms = extraTerms;
     }
 
-    public Analyzer getAnalyzer() {
-        return analyzer;
-    }
-
     public void setAnalyzer(Analyzer analyzer) {
         this.analyzer = analyzer;
-    }
-
-    public String getFields() {
-        return fields;
     }
 
     public void setFields(String fields) {
         this.fields = fields;
     }
 
-    public float getBoostFactor() {
-        return boostFactor;
-    }
-
     public void setBoostFactor(float boostFactor) {
         this.boostFactor = boostFactor;
-    }
-
-    public String getQueryType() {
-        return queryType;
     }
 
     public void setQueryType(String queryType) {

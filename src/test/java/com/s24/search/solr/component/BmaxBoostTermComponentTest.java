@@ -58,8 +58,6 @@ public class BmaxBoostTermComponentTest {
         initArgs.add("synonymFieldType", "synonymFieldType");
         initArgs.add("boostTermFieldType", "boostTermFieldType");
         initArgs.add("penalizeTermFieldType", "penalizeTermFieldType");
-        initArgs.add("boostQueryType", "tidismax");
-        initArgs.add("penalizeQueryType", "tidismax");
     }
 
     @Test
@@ -112,7 +110,7 @@ public class BmaxBoostTermComponentTest {
 
         // 'a' was removed from q as it is a stopword in StandardAnalyzer
         Assert.assertThat(argument.getValue().getParams("rqq"),
-                CoreMatchers.equalTo(new String[] {"{!tidismax qf='field1^-100.0 field2^-300.0 ' mm=1 bq=''} b c"}) );
+                CoreMatchers.equalTo(new String[] {"{!dismax qf='field1^-100.0 field2^-300.0 ' mm=1 bq=''} b c"}) );
     }
 
     @Test
@@ -136,7 +134,7 @@ public class BmaxBoostTermComponentTest {
         verify(request).setParams(argument.capture());
 
         Assert.assertThat(argument.getValue().getParams("bq"),
-                CoreMatchers.equalTo(new String[] {"{!tidismax qf='field1^-1000000.0 field2^-3000000.0 ' mm=1 bq=''} b c"}) );
+                CoreMatchers.equalTo(new String[] {"{!dismax qf='field1^-1000000.0 field2^-3000000.0 ' mm=1 bq=''} b c"}) );
 
     }
 }

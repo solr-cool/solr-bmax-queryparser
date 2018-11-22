@@ -1,6 +1,5 @@
 package com.s24.search.solr.component.termstrategy;
 
-import com.s24.search.solr.component.AbstractTermRankingStrategy;
 import org.apache.lucene.analysis.Analyzer;
 
 public class TermRankingStrategyBuilder {

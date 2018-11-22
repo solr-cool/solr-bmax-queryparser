@@ -1,6 +1,5 @@
 package com.s24.search.solr.component.termstrategy;
 
-import com.s24.search.solr.component.AbstractTermRankingStrategy;
 import org.apache.solr.common.params.CommonParams;
 import org.apache.solr.common.params.ModifiableSolrParams;
 
@@ -23,13 +22,5 @@ public class RerankingTermRankingStrategy extends AbstractTermRankingStrategy {
                             reRankDocs));
             params.add("rqq", termRankingQueryString);
         }
-    }
-
-    protected int getReRankDocs() {
-        return reRankDocs;
-    }
-
-    protected void setReRankDocs(int reRankDocs) {
-        this.reRankDocs = reRankDocs;
     }
 }
