@@ -69,7 +69,7 @@ public class BmaxBoostTermComponentTest {
         params.set("q", "a b c");
         params.set("rq", "dummy");
         params.set(PENALIZE_ENABLE, true);
-        params.set(PENALIZE_STRATEGY, VALUE_PENALIZE_STRATEGY_RERANK);
+        params.set(PENALIZE_STRATEGY, VALUE_STRATEGY_RERANK);
         params.set(SYNONYM_ENABLE, false);
         params.set(BOOST_ENABLE, false);
         params.set(DisMaxParams.QF, "field1 field2^3");
@@ -93,7 +93,7 @@ public class BmaxBoostTermComponentTest {
         ModifiableSolrParams params = new ModifiableSolrParams();
         params.set("q", "a b c");
         params.set(PENALIZE_ENABLE, true);
-        params.set(PENALIZE_STRATEGY, VALUE_PENALIZE_STRATEGY_RERANK);
+        params.set(PENALIZE_STRATEGY, VALUE_STRATEGY_RERANK);
         params.set(SYNONYM_ENABLE, false);
         params.set(BOOST_ENABLE, false);
         params.set(DisMaxParams.QF, "field1 field2^3");
@@ -121,7 +121,7 @@ public class BmaxBoostTermComponentTest {
         ModifiableSolrParams params = new ModifiableSolrParams();
         params.set("q", "a b c");
         params.set(PENALIZE_ENABLE, true);
-        params.set(PENALIZE_STRATEGY, VALUE_PENALIZE_STRATEGY_BOOST_QUERY);
+        params.set(PENALIZE_STRATEGY, VALUE_STRATEGY_ADDITIVELY);
         params.set(PENALIZE_FACTOR, 1000000);
         params.set(SYNONYM_ENABLE, false);
         params.set(BOOST_ENABLE, false);

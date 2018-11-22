@@ -27,9 +27,9 @@ import com.s24.search.solr.util.BmaxDebugInfo;
 
 /**
  * Adds boost and penalize terms to a query. Boost terms are filled into a
- * <code>bq</code> boost query parameter that can be picked up by the bmax
- * and/or edismax query parser. Penalize terms are filled into a rerank query
- * that will be executed by the {@linkplain ReRankQParserPlugin}.
+ * <code>bq</code> boost query, <code>boost</code> function or <code>rq</code>
+ * Rerankquery parameter that can be picked up by the bmax and/or edismax query parser
+ * and the {@linkplain ReRankQParserPlugin} respectively.
  *
  * @author Shopping24 GmbH, Torsten Bøgh Köster (@tboeghk)
  */
@@ -128,16 +128,16 @@ public class BmaxBoostTermComponent extends SearchComponent {
    private String applyBoosts(final ModifiableSolrParams params, final IndexSchema schema, String q) {
       final String boostExtraTerms = params.get(BOOST_EXTRA_TERMS);
       final float boostFactor = Math.abs(params.getFloat(BOOST_FACTOR, 1f));
-      final String boostStrategy = params.get(BOOST_STRATEGY, VALUE_BOOST_STRATEGY_ADDITIVELY);
+      final String boostStrategy = params.get(BOOST_STRATEGY, VALUE_STRATEGY_ADDITIVELY);
       final String queryFields = (params.get(BOOST_FIELDS) != null ? BOOST_FIELDS : DisMaxParams.QF);
       final Analyzer boostAnalyzer = schema.getFieldTypeByName(boostTermFieldType).getQueryAnalyzer();
       final int boostDocCount = params.getInt(BOOST_DOC_COUNT, 400);
 
       TermRankingStrategyBuilder termRankingStrategyBuilder = new TermRankingStrategyBuilder();
       switch(boostStrategy) {
-         case "bq": termRankingStrategyBuilder.additiveTermRankingStrategy(); break;
-         case "boost": termRankingStrategyBuilder.multiplicativeTermRankingStrategy(); break;
-         case "rq": termRankingStrategyBuilder.rerankTermRankingStrategy(boostDocCount); break;
+         case VALUE_STRATEGY_ADDITIVELY: termRankingStrategyBuilder.additiveTermRankingStrategy(); break;
+         case VALUE_STRATEGY_MULTIPLICATIVE: termRankingStrategyBuilder.multiplicativeTermRankingStrategy(); break;
+         case VALUE_STRATEGY_RERANK: termRankingStrategyBuilder.rerankTermRankingStrategy(boostDocCount); break;
       }
 
       TermRankingStrategy strategy = termRankingStrategyBuilder
@@ -155,16 +155,16 @@ public class BmaxBoostTermComponent extends SearchComponent {
    private String applyPenalizing(final ModifiableSolrParams params, final IndexSchema schema, String q) {
       final String penalizeExtraTerms = params.get(PENALIZE_EXTRA_TERMS);
       final float penalizeFactor = Math.abs(params.getFloat(PENALIZE_FACTOR, 100.0f));
-      final String penalizeStrategy = params.get(PENALIZE_STRATEGY, VALUE_PENALIZE_STRATEGY_RERANK);
+      final String penalizeStrategy = params.get(PENALIZE_STRATEGY, VALUE_STRATEGY_RERANK);
       final String queryFields = (params.get(PENALIZE_FIELDS) != null ? PENALIZE_FIELDS : DisMaxParams.QF);
       final Analyzer penalizeAnalyzer = schema.getFieldTypeByName(penalizeTermFieldType).getQueryAnalyzer();
       final int penalizeDocCount = params.getInt(PENALIZE_DOC_COUNT, 400);
 
       TermRankingStrategyBuilder termRankingStrategyBuilder = new TermRankingStrategyBuilder();
       switch(penalizeStrategy) {
-         case "bq": termRankingStrategyBuilder.additiveTermRankingStrategy(); break;
-         case "boost": termRankingStrategyBuilder.multiplicativeTermRankingStrategy(); break;
-         case "rq": termRankingStrategyBuilder.rerankTermRankingStrategy(penalizeDocCount); break;
+         case VALUE_STRATEGY_ADDITIVELY: termRankingStrategyBuilder.additiveTermRankingStrategy(); break;
+         case VALUE_STRATEGY_MULTIPLICATIVE: termRankingStrategyBuilder.multiplicativeTermRankingStrategy(); break;
+         case VALUE_STRATEGY_RERANK: termRankingStrategyBuilder.rerankTermRankingStrategy(penalizeDocCount); break;
       }
 
       TermRankingStrategy strategy = termRankingStrategyBuilder
