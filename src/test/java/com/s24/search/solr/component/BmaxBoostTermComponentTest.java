@@ -143,31 +143,4 @@ public class BmaxBoostTermComponentTest {
                 CoreMatchers.equalTo(new String[] {"(field1:(b OR c) OR field2:(b OR c))^-100.000000"}) );
 
     }
-
-    @Test
-    public void testThatBoostQueryStrategyIsNotAppliedIfBqAlreadyExists() throws Exception {
-
-        BmaxBoostTermComponent component = new BmaxBoostTermComponent();
-        component.init(initArgs);
-        ModifiableSolrParams params = new ModifiableSolrParams();
-        params.set("q", "a b c");
-        params.set("bq", "dummy");
-        params.set(PENALIZE_ENABLE, false);
-        params.set(PENALIZE_STRATEGY, VALUE_PENALIZE_STRATEGY_BOOST_QUERY);
-        params.set(SYNONYM_ENABLE, false);
-        params.set(BOOST_ENABLE, true);
-        params.set(DisMaxParams.QF, "field1 field2^3");
-        when(request.getParams()).thenReturn(params);
-
-        component.prepareInternal(responseBuilder);
-        ArgumentCaptor<SolrParams> argument = ArgumentCaptor.forClass(SolrParams.class);
-        verify(request).setParams(argument.capture());
-
-        Assert.assertThat(argument.getValue().getParams("bq"),
-                CoreMatchers.equalTo(new String[] {"dummy"}) );
-
-
-    }
-
-
 }

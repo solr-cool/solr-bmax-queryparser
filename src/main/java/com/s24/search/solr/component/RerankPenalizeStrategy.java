@@ -12,10 +12,10 @@ public class RerankPenalizeStrategy extends PenalizeStrategy {
     protected final int penalizeDocs;
     protected final float penalizeFactor;
 
-    public RerankPenalizeStrategy(final ResponseBuilder rb, final String q, final String penalizeExtraTerms,
+    public RerankPenalizeStrategy(final String q, final String penalizeExtraTerms,
                                   final Analyzer penalizeAnalyzer, final String penalizeFields, final int penalizeDocs,
                                   final float penalizeFactor) {
-        super(rb, q, penalizeExtraTerms, penalizeAnalyzer, penalizeFields);
+        super(q, penalizeExtraTerms, penalizeAnalyzer, penalizeFields);
         this.penalizeDocs = penalizeDocs;
         this.penalizeFactor = penalizeFactor;
     }
