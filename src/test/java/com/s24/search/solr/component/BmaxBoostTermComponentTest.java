@@ -33,6 +33,7 @@ public class BmaxBoostTermComponentTest {
     IndexSchema schema = mock(IndexSchema.class);
     FieldType queryParsingFieldType = mock(FieldType.class);
     FieldType penalizeTermFieldType = mock(FieldType.class);
+    FieldType boostTermFieldType = mock(FieldType.class);
 
     ResponseBuilder responseBuilder = new ResponseBuilder(request, response, Collections.emptyList());
 
@@ -54,48 +55,28 @@ public class BmaxBoostTermComponentTest {
         when(schema.getFieldTypeByName("penalizeTermFieldType")).thenReturn(penalizeTermFieldType);
         when(penalizeTermFieldType.getQueryAnalyzer()).thenReturn(new StandardAnalyzer());
 
+        when(schema.getFieldTypeByName("boostTermFieldType")).thenReturn(boostTermFieldType);
+        when(boostTermFieldType.getQueryAnalyzer()).thenReturn(new StandardAnalyzer());
+
         initArgs.add("queryParsingFieldType", "queryParsingFieldType");
         initArgs.add("synonymFieldType", "synonymFieldType");
         initArgs.add("boostTermFieldType", "boostTermFieldType");
         initArgs.add("penalizeTermFieldType", "penalizeTermFieldType");
     }
 
+    ////////Basic tests that test if a RankingStrategy is applied for Boosts and Penalizing independantly////////
     @Test
-    public void testThatRerankStrategyIsNotAppliedIfRqAlreadyExists() throws Exception {
+    public void testThatRerankStrategyForPenalizingIsApplied() throws Exception {
 
         BmaxBoostTermComponent component = new BmaxBoostTermComponent();
         component.init(initArgs);
         ModifiableSolrParams params = new ModifiableSolrParams();
         params.set("q", "a b c");
-        params.set("rq", "dummy");
-        params.set(PENALIZE_ENABLE, true);
-        params.set(PENALIZE_STRATEGY, VALUE_STRATEGY_RERANK);
         params.set(SYNONYM_ENABLE, false);
         params.set(BOOST_ENABLE, false);
-        params.set(DisMaxParams.QF, "field1 field2^3");
-        when(request.getParams()).thenReturn(params);
-
-        component.prepareInternal(responseBuilder);
-        ArgumentCaptor<SolrParams> argument = ArgumentCaptor.forClass(SolrParams.class);
-        verify(request).setParams(argument.capture());
-
-        Assert.assertThat(argument.getValue().getParams("rq"),
-                CoreMatchers.equalTo(new String[] {"dummy"}) );
-
-
-    }
-
-    @Test
-    public void testThatRerankStrategyIsApplied() throws Exception {
-
-        BmaxBoostTermComponent component = new BmaxBoostTermComponent();
-        component.init(initArgs);
-        ModifiableSolrParams params = new ModifiableSolrParams();
-        params.set("q", "a b c");
         params.set(PENALIZE_ENABLE, true);
         params.set(PENALIZE_STRATEGY, VALUE_STRATEGY_RERANK);
-        params.set(SYNONYM_ENABLE, false);
-        params.set(BOOST_ENABLE, false);
+        params.set(PENALIZE_FACTOR,1000000);
         params.set(DisMaxParams.QF, "field1 field2^3");
         when(request.getParams()).thenReturn(params);
 
@@ -110,21 +91,51 @@ public class BmaxBoostTermComponentTest {
 
         // 'a' was removed from q as it is a stopword in StandardAnalyzer
         Assert.assertThat(argument.getValue().getParams("rqq"),
-                CoreMatchers.equalTo(new String[] {"{!dismax qf='field1^-100.0 field2^-300.0 ' mm=1 bq=''} b c"}) );
+                CoreMatchers.equalTo(new String[] {"{!dismax qf='field1^-1000000.0 field2^-3000000.0 ' mm=1 bq=''} b c"}) );
     }
 
     @Test
-    public void testThatBoostQueryStrategyIsApplied() throws Exception {
+    public void testThatRerankStrategyForBoostingIsApplied() throws Exception {
 
         BmaxBoostTermComponent component = new BmaxBoostTermComponent();
         component.init(initArgs);
         ModifiableSolrParams params = new ModifiableSolrParams();
         params.set("q", "a b c");
+        params.set(PENALIZE_ENABLE, false);
+        params.set(SYNONYM_ENABLE, false);
+        params.set(BOOST_ENABLE, true);
+        params.set(BOOST_STRATEGY, VALUE_STRATEGY_RERANK);
+        params.set(BOOST_FACTOR,100);
+        params.set(DisMaxParams.QF, "field1 field2^3");
+        when(request.getParams()).thenReturn(params);
+
+        component.prepareInternal(responseBuilder);
+
+        ArgumentCaptor<SolrParams> argument = ArgumentCaptor.forClass(SolrParams.class);
+        verify(request).setParams(argument.capture());
+
+        Assert.assertThat(argument.getValue().getParams("rq"),
+                CoreMatchers.equalTo(
+                        new String[] {"{!rerank reRankQuery=$rqq reRankDocs=400}"}) );
+
+        // 'a' was removed from q as it is a stopword in StandardAnalyzer
+        Assert.assertThat(argument.getValue().getParams("rqq"),
+                CoreMatchers.equalTo(new String[] {"{!dismax qf='field1^100.0 field2^300.0 ' mm=1 bq=''} b c"}) );
+    }
+
+    @Test
+    public void testThatAdditiveStrategyForPenalizingIsApplied() throws Exception {
+
+        BmaxBoostTermComponent component = new BmaxBoostTermComponent();
+        component.init(initArgs);
+        ModifiableSolrParams params = new ModifiableSolrParams();
+        params.set("q", "a b c");
+
+        params.set(SYNONYM_ENABLE, false);
+        params.set(BOOST_ENABLE, false);
         params.set(PENALIZE_ENABLE, true);
         params.set(PENALIZE_STRATEGY, VALUE_STRATEGY_ADDITIVELY);
         params.set(PENALIZE_FACTOR, 1000000);
-        params.set(SYNONYM_ENABLE, false);
-        params.set(BOOST_ENABLE, false);
         params.set(DisMaxParams.QF, "field1 field2^3");
         when(request.getParams()).thenReturn(params);
 
@@ -135,6 +146,223 @@ public class BmaxBoostTermComponentTest {
 
         Assert.assertThat(argument.getValue().getParams("bq"),
                 CoreMatchers.equalTo(new String[] {"{!dismax qf='field1^-1000000.0 field2^-3000000.0 ' mm=1 bq=''} b c"}) );
+    }
 
+    @Test
+    public void testThatAdditiveStrategyForBoostingIsApplied() throws Exception {
+
+        BmaxBoostTermComponent component = new BmaxBoostTermComponent();
+        component.init(initArgs);
+        ModifiableSolrParams params = new ModifiableSolrParams();
+        params.set("q", "a b c");
+
+        params.set(PENALIZE_ENABLE, false);
+        params.set(SYNONYM_ENABLE, false);
+        params.set(BOOST_ENABLE, true);
+        params.set(BOOST_STRATEGY, VALUE_STRATEGY_ADDITIVELY);
+        params.set(BOOST_FACTOR,100);
+        params.set(DisMaxParams.QF, "field1 field2^3");
+        when(request.getParams()).thenReturn(params);
+
+        component.prepareInternal(responseBuilder);
+
+        ArgumentCaptor<SolrParams> argument = ArgumentCaptor.forClass(SolrParams.class);
+        verify(request).setParams(argument.capture());
+
+        Assert.assertThat(argument.getValue().getParams("bq"),
+                CoreMatchers.equalTo(new String[] {"{!dismax qf='field1^100.0 field2^300.0 ' mm=1 bq=''} b c"}) );
+    }
+
+    @Test
+    public void testThatMultiplicativeStrategyForPenalizingIsApplied() throws Exception {
+
+        BmaxBoostTermComponent component = new BmaxBoostTermComponent();
+        component.init(initArgs);
+        ModifiableSolrParams params = new ModifiableSolrParams();
+        params.set("q", "a b c");
+
+        params.set(SYNONYM_ENABLE, false);
+        params.set(BOOST_ENABLE, false);
+        params.set(PENALIZE_ENABLE, true);
+        params.set(PENALIZE_STRATEGY, VALUE_STRATEGY_MULTIPLICATIVE);
+        params.set(PENALIZE_FACTOR, 1000000);
+        params.set(DisMaxParams.QF, "field1 field2^3");
+        when(request.getParams()).thenReturn(params);
+
+        component.prepareInternal(responseBuilder);
+
+        ArgumentCaptor<SolrParams> argument = ArgumentCaptor.forClass(SolrParams.class);
+        verify(request).setParams(argument.capture());
+
+        Assert.assertThat(argument.getValue().getParams("boost"),
+                CoreMatchers.equalTo(new String[] {"{!dismax qf='field1^-1000000.0 field2^-3000000.0 ' mm=1 bq=''} b c"}) );
+    }
+
+    @Test
+    public void testThatMultiplicativeStrategyForBoostingIsApplied() throws Exception {
+
+        BmaxBoostTermComponent component = new BmaxBoostTermComponent();
+        component.init(initArgs);
+        ModifiableSolrParams params = new ModifiableSolrParams();
+        params.set("q", "a b c");
+
+        params.set(SYNONYM_ENABLE, false);
+        params.set(PENALIZE_ENABLE, false);
+        params.set(BOOST_ENABLE, true);
+        params.set(BOOST_STRATEGY, VALUE_STRATEGY_MULTIPLICATIVE);
+        params.set(BOOST_FACTOR,100);
+        params.set(DisMaxParams.QF, "field1 field2^3");
+        when(request.getParams()).thenReturn(params);
+
+        component.prepareInternal(responseBuilder);
+
+        ArgumentCaptor<SolrParams> argument = ArgumentCaptor.forClass(SolrParams.class);
+        verify(request).setParams(argument.capture());
+
+        Assert.assertThat(argument.getValue().getParams("boost"),
+                CoreMatchers.equalTo(new String[] {"{!dismax qf='field1^100.0 field2^300.0 ' mm=1 bq=''} b c"}) );
+    }
+
+    //////////////////////////////////////////Tests for potential edgecases//////////////////////////////////////
+
+    /**
+     * RerankStrategy mustn't be applied if rq is already set to avoid overwriting
+     * @throws Exception
+     */
+    @Test
+    public void testThatRerankStrategyForPenalizingIsNotAppliedIfRqAlreadyExists() throws Exception {
+
+        BmaxBoostTermComponent component = new BmaxBoostTermComponent();
+        component.init(initArgs);
+        ModifiableSolrParams params = new ModifiableSolrParams();
+        params.set("q", "a b c");
+        params.set("rq", "dummy");
+        params.set(SYNONYM_ENABLE, false);
+        params.set(BOOST_ENABLE, false);
+        params.set(PENALIZE_ENABLE, true);
+        params.set(PENALIZE_STRATEGY, VALUE_STRATEGY_RERANK);
+        params.set(DisMaxParams.QF, "field1 field2^3");
+        when(request.getParams()).thenReturn(params);
+
+        component.prepareInternal(responseBuilder);
+        ArgumentCaptor<SolrParams> argument = ArgumentCaptor.forClass(SolrParams.class);
+        verify(request).setParams(argument.capture());
+
+        Assert.assertThat(argument.getValue().getParams("rq"),
+                CoreMatchers.equalTo(new String[] {"dummy"}) );
+    }
+
+    /**
+     * RerankStrategy mustn't be applied if rq is already set to avoid overwriting
+     * @throws Exception
+     */
+    @Test
+    public void testThatRerankStrategyForBoostingIsNotAppliedIfRqAlreadyExists() throws Exception {
+
+        BmaxBoostTermComponent component = new BmaxBoostTermComponent();
+        component.init(initArgs);
+        ModifiableSolrParams params = new ModifiableSolrParams();
+        params.set("q", "a b c");
+        params.set("rq", "dummy");
+        params.set(SYNONYM_ENABLE, false);
+        params.set(PENALIZE_ENABLE, false);
+        params.set(BOOST_ENABLE, true);
+        params.set(BOOST_STRATEGY, VALUE_STRATEGY_RERANK);
+        params.set(DisMaxParams.QF, "field1 field2^3");
+        when(request.getParams()).thenReturn(params);
+
+        component.prepareInternal(responseBuilder);
+        ArgumentCaptor<SolrParams> argument = ArgumentCaptor.forClass(SolrParams.class);
+        verify(request).setParams(argument.capture());
+
+        Assert.assertThat(argument.getValue().getParams("rq"),
+                CoreMatchers.equalTo(new String[] {"dummy"}) );
+    }
+
+    /**
+     * Boost applies first and only one RerankQuery can be applied
+     * @throws Exception
+     */
+    @Test
+    public void testThatRerankStrategyForPenalizingIsNotAppliedIfBoostAlsoUsesRQ() throws Exception {
+
+        BmaxBoostTermComponent component = new BmaxBoostTermComponent();
+        component.init(initArgs);
+        ModifiableSolrParams params = new ModifiableSolrParams();
+        params.set("q", "a b c");
+        params.set(SYNONYM_ENABLE, false);
+        params.set(BOOST_ENABLE, true);
+        params.set(PENALIZE_ENABLE, true);
+        params.set(BOOST_STRATEGY, VALUE_STRATEGY_RERANK);
+        params.set(PENALIZE_STRATEGY, VALUE_STRATEGY_RERANK);
+        params.set(DisMaxParams.QF, "field1 field2^3");
+        when(request.getParams()).thenReturn(params);
+
+        component.prepareInternal(responseBuilder);
+        ArgumentCaptor<SolrParams> argument = ArgumentCaptor.forClass(SolrParams.class);
+        verify(request).setParams(argument.capture());
+
+        Assert.assertThat(argument.getValue().getParams("rq"),
+                CoreMatchers.equalTo(new String[] {"{!rerank reRankQuery=$rqq reRankDocs=400}"}) );
+        Assert.assertThat(argument.getValue().getParams("rqq"),
+                CoreMatchers.equalTo(new String[] {"{!dismax qf='field1^1.0 field2^3.0 ' mm=1 bq=''} b c"}) );
+    }
+
+    /**
+     * Tests that both boosting and penalizing may use the same Strategy if it is multiplicative
+     * @throws Exception
+     */
+    @Test
+    public void testThatMultiplicativeStrategyForBoostAndPenalizingIsApplied() throws Exception {
+
+        BmaxBoostTermComponent component = new BmaxBoostTermComponent();
+        component.init(initArgs);
+        ModifiableSolrParams params = new ModifiableSolrParams();
+        params.set("q", "a b c");
+
+        params.set(SYNONYM_ENABLE, false);
+        params.set(BOOST_ENABLE, true);
+        params.set(PENALIZE_ENABLE, true);
+        params.set(BOOST_STRATEGY, VALUE_STRATEGY_MULTIPLICATIVE);
+        params.set(PENALIZE_STRATEGY, VALUE_STRATEGY_MULTIPLICATIVE);
+        params.set(DisMaxParams.QF, "field1 field2^3");
+        when(request.getParams()).thenReturn(params);
+
+        component.prepareInternal(responseBuilder);
+
+        ArgumentCaptor<SolrParams> argument = ArgumentCaptor.forClass(SolrParams.class);
+        verify(request).setParams(argument.capture());
+
+        Assert.assertThat(argument.getValue().getParams("boost"),
+                CoreMatchers.equalTo(new String[] {"{!dismax qf='field1^1.0 field2^3.0 ' mm=1 bq=''} b c", "{!dismax qf='field1^-100.0 field2^-300.0 ' mm=1 bq=''} b c"}) );
+    }
+
+    /**
+     * Tests that both boosting and penalizing may use the same Strategy if it is additive
+     * @throws Exception
+     */
+    @Test
+    public void testThatAdditiveStrategyForBoostAndPenalizingIsApplied() throws Exception {
+
+        BmaxBoostTermComponent component = new BmaxBoostTermComponent();
+        component.init(initArgs);
+        ModifiableSolrParams params = new ModifiableSolrParams();
+        params.set("q", "a b c");
+
+        params.set(SYNONYM_ENABLE, false);
+        params.set(BOOST_ENABLE, true);
+        params.set(PENALIZE_ENABLE, true);
+        params.set(BOOST_STRATEGY, VALUE_STRATEGY_ADDITIVELY);
+        params.set(PENALIZE_STRATEGY, VALUE_STRATEGY_ADDITIVELY);
+        params.set(DisMaxParams.QF, "field1 field2^3");
+        when(request.getParams()).thenReturn(params);
+
+        component.prepareInternal(responseBuilder);
+
+        ArgumentCaptor<SolrParams> argument = ArgumentCaptor.forClass(SolrParams.class);
+        verify(request).setParams(argument.capture());
+
+        Assert.assertThat(argument.getValue().getParams("bq"),
+                CoreMatchers.equalTo(new String[] {"{!dismax qf='field1^1.0 field2^3.0 ' mm=1 bq=''} b c", "{!dismax qf='field1^-100.0 field2^-300.0 ' mm=1 bq=''} b c"}) );
     }
 }
