@@ -66,11 +66,13 @@ The Bmax boost component enriches the query with boost and penalize terms.
 
 * `bmax.booster` (boolean) - enable/disable boost term component. Default is `false`.
 * `bmax.booster.boost` (boolean) - enable/disable boost term resolution. Default is `true`.
-* `bmax.booster.boost.factor` (float) - boost factor that is multiplied to the boosts given in the `qf` parameter for each query field respectivly, default is `1.0`.
+* `bmax.booster.boost.factor` (float) - boost factor that is multiplied to the boosts given in the `qf` or `bmax.booster.boost.qf` parameter for each query field respectivly, default is `1.0`.
+* `bmax.booster.boost.strategy` (String) - strategy for combining boost terms with the main query: `rq` - rerank query, `bq`- boost query (additively), `boost`- boost function (multiplicative). Default is `rq`.
+* `bmax.booster.boost.docs` (int) - The number of documents to boost from the begin of the result set (rerank query strategy only). Default is `400`.*
 * `bmax.booster.boost.extra` (String) - comma separated extra boost terms. Great to check new boost term ideas.
 * `bmax.booster.penalize` (boolean) - enable/disable penalize term resolution. Default is `true`.
 * `bmax.booster.penalize.factor` (float) - Penalize factor that is used as negative weight in the penalize query. Default is `100.0`.
-* `bmax.booster.penalize.strategy` (String) - strategy for combining penalize terms with the main query: `rq` - rerank query, `bq`- boost query. Default is `rq`.
+* `bmax.booster.penalize.strategy` (String) - strategy for combining penalize terms with the main query: `rq` - rerank query, `bq`- boost query (additively), `boost`- boost function (multiplicative). Default is `rq`.
 * `bmax.booster.penalize.docs` (int) - The number of documents to penalize from the begin of the result set (rerank query strategy only). Default is `400`.
 * `bmax.booster.penalize.extra` (String) - comma separated extra penalize terms. Great to check new ideas.
 
