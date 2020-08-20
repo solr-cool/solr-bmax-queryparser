@@ -289,7 +289,7 @@ Define new versions
 
 Then execute the release chain
 
-    $ mvn org.codehaus.mojo:versions-maven-plugin:2.0:set -DgenerateBackupPoms=false -DnewVersion=$NEXT_VERSION
+    $ mvn org.codehaus.mojo:versions-maven-plugin:2.8.1:set -DgenerateBackupPoms=false -DnewVersion=$NEXT_VERSION
     $ git commit -a -m "pushes to release version $NEXT_VERSION"
     $ mvn -P release
     
