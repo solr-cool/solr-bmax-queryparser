@@ -1,7 +1,10 @@
 The boosting dismax query parser (bmax)
 ==================
 
-![travis ci build status](https://travis-ci.org/shopping24/solr-bmax-queryparser.png)
+[![travis ci build status](https://travis-ci.org/solr-cool/solr-bmax-queryparser.png)](https://travis-ci.org/github/solr-cool/solr-bmax-queryparser)
+[![Maven Central](https://img.shields.io/maven-central/v/cool.solr/solr-bmax-queryparser)](https://search.maven.org/artifact/cool.solr/solr-bmax-queryparser/)
+
+> ♻️ this is the official and maintained fork of the original [@shopping24](https://github.com/shopping24) repository maintained by [solr.cool](https://solr.cool).
 
 A synonym aware edismax query parser for Apache Solr. The bmax query parser relies on
 field types and tokenizer chains to parse the user query, discovers synonyms, subtopics, boost 
@@ -187,7 +190,7 @@ The boost query (if given) is appended.
 
 ## Installing the Bmax query parser
 
-* Place the [`solr-bmax-queryparser-<VERSION>-jar-with-dependencies.jar`](https://github.com/shopping24/solr-bmax-queryparser/releases) in the `/lib` 
+* Place the [`solr-bmax-queryparser-<VERSION>-jar-with-dependencies.jar`](https://github.com/solr-cool/solr-bmax-queryparser/releases) in the `/lib` 
   directory of your Solr installation. 
 * Configure at least one field type in your `schema.xml` that can be used for query parsing and tokenizing
 * Configure the `bmax` query parser in your `solrconfig.xml` (see below)
@@ -197,9 +200,9 @@ The boost query (if given) is appended.
 This project is also vailable from Maven Central:
 
     <dependency>
-        <groupId>com.s24.search.solr</groupId>
+        <groupId>cool.solr</groupId>
         <artifactId>solr-bmax-queryparser</artifactId>
-        <version>1.5.0</version>
+        <version>2.7.0</version>
         <classifier>jar-with-dependencies</classifier>
     </dependency>
 
